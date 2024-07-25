@@ -1,5 +1,5 @@
 b7cea9c894d78cf60b178b55169eaa0f  debian/bin/gencontrol.py
-621ef03b6e367f548b563da00550ea55  debian/build/version-info
+37b2ea7bb7d2bc3a91d56cd39706f1d2  debian/build/version-info
 c06195eaf3f5d361e55133652fb46a6d  debian/templates/config.control.in
 d010dac283dad435d3bc0ef4e08f4af9  debian/templates/docs.control.in
 0abe84ef18b69b7b7efda55c60b62e75  debian/templates/docs.meta.control.in
@@ -18,7 +18,7 @@ ecec9b1808743ce6dd807a7bbdb293d1  debian/templates/image-dbg.meta.maintscript.in
 8e2a7bfff102c8a13ba1dc828e562080  debian/templates/image-unsigned.NEWS.in
 7840402797f1410755053970be5a1b5d  debian/templates/image-unsigned.control.in
 0327750d6696dee915a532aec73a0fd6  debian/templates/image-unsigned.postinst.in
-a4a60fc48b3240e46bbac6a1ddcaad30  debian/templates/image-unsigned.postrm.in
+03fc85a4557719a9cfcc61eb9d3bdf7b  debian/templates/image-unsigned.postrm.in
 38004750aa03cea41d5d3aeafff16fcc  debian/templates/image-unsigned.preinst.in
 afb508873a44a1f196c2a525fec4b415  debian/templates/image-unsigned.prerm.in
 8e2a7bfff102c8a13ba1dc828e562080  debian/templates/image.NEWS.in
@@ -27,7 +27,7 @@ afb508873a44a1f196c2a525fec4b415  debian/templates/image-unsigned.prerm.in
 c801fd63bc03b985079b5cf6eaf644b9  debian/templates/image.meta.control.in
 15e98dd33b3bb098bf9f25114c8371c2  debian/templates/image.meta.maintscript.in
 0327750d6696dee915a532aec73a0fd6  debian/templates/image.postinst.in
-a4a60fc48b3240e46bbac6a1ddcaad30  debian/templates/image.postrm.in
+03fc85a4557719a9cfcc61eb9d3bdf7b  debian/templates/image.postrm.in
 38004750aa03cea41d5d3aeafff16fcc  debian/templates/image.preinst.in
 afb508873a44a1f196c2a525fec4b415  debian/templates/image.prerm.in
 d41d8cd98f00b204e9800998ecf8427e  debian/templates/image.tests-control.in
@@ -42,7 +42,7 @@ fe7cdc2df9d38c9a43bfc1f5abadd127  debian/templates/signed.headers.meta.lintian-o
 8e2a7bfff102c8a13ba1dc828e562080  debian/templates/signed.image.NEWS.in
 d0f4305dd51861c31b7d5a7cf9bd0d4f  debian/templates/signed.image.control.in
 0327750d6696dee915a532aec73a0fd6  debian/templates/signed.image.postinst.in
-a4a60fc48b3240e46bbac6a1ddcaad30  debian/templates/signed.image.postrm.in
+03fc85a4557719a9cfcc61eb9d3bdf7b  debian/templates/signed.image.postrm.in
 38004750aa03cea41d5d3aeafff16fcc  debian/templates/signed.image.preinst.in
 afb508873a44a1f196c2a525fec4b415  debian/templates/signed.image.prerm.in
 e642c662e64df7b08db8546492cb703e  debian/templates/signed.source.control.in

@@ -158,6 +158,9 @@ extern void __of_sysfs_remove_bin_file(struct device_node *np,
 extern int of_bus_n_addr_cells(struct device_node *np);
 extern int of_bus_n_size_cells(struct device_node *np);
 
+const __be32 *of_irq_parse_imap_parent(const __be32 *imap, int len,
+				       struct of_phandle_args *out_irq);
+
 struct bus_dma_region;
 #if defined(CONFIG_OF_ADDRESS) && defined(CONFIG_HAS_DMA)
 int of_dma_get_range(struct device_node *np,
@@ -175,8 +178,9 @@ static inline struct device_node *__of_get_dma_parent(const struct device_node *
 }
 #endif
 
+int fdt_scan_reserved_mem(void);
 void fdt_init_reserved_mem(void);
-void fdt_reserved_mem_save_node(unsigned long node, const char *uname,
-			       phys_addr_t base, phys_addr_t size);
+
+bool of_fdt_device_is_available(const void *blob, unsigned long node);
 
 #endif /* _LINUX_OF_PRIVATE_H */

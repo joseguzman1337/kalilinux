@@ -208,38 +208,45 @@ struct smb2_transform_hdr {
 	__le64  SessionId;
 } __packed;
 
-
-/* See MS-SMB2 2.2.42 */
-struct smb2_compression_transform_hdr_unchained {
-	__le32 ProtocolId;	/* 0xFC 'S' 'M' 'B' */
-	__le32 OriginalCompressedSegmentSize;
-	__le16 CompressionAlgorithm;
-	__le16 Flags;
-	__le16 Length; /* if chained it is length, else offset */
-} __packed;
-
-/* See MS-SMB2 2.2.42.1 */
+/*
+ * These are simplified versions from the spec, as we don't need a fully fledged
+ * form of both unchained and chained structs.
+ *
+ * Moreover, even in chained compressed payloads, the initial compression header
+ * has the form of the unchained one -- i.e. it never has the
+ * OriginalPayloadSize field and ::Offset field always represent an offset
+ * (instead of a length, as it is in the chained header).
+ *
+ * See MS-SMB2 2.2.42 for more details.
+ */
 #define SMB2_COMPRESSION_FLAG_NONE	0x0000
 #define SMB2_COMPRESSION_FLAG_CHAINED	0x0001
 
-struct compression_payload_header {
+struct smb2_compression_hdr {
+	__le32 ProtocolId; /* 0xFC 'S' 'M' 'B' */
+	__le32 OriginalCompressedSegmentSize;
+	__le16 CompressionAlgorithm;
+	__le16 Flags;
+	__le32 Offset; /* this is the size of the uncompressed SMB2 header below */
+	/* uncompressed SMB2 header (READ or WRITE) goes here */
+	/* compressed data goes here */
+} __packed;
+
+/*
+ * ... OTOH, set compression payload header to always have OriginalPayloadSize
+ * as it's easier to pass the struct size minus sizeof(OriginalPayloadSize)
+ * than to juggle around the header/data memory.
+ */
+struct smb2_compression_payload_hdr {
 	__le16	CompressionAlgorithm;
 	__le16	Flags;
 	__le32	Length; /* length of compressed playload including field below if present */
-	/* __le32 OriginalPayloadSize; */ /* optional, present when LZNT1, LZ77, LZ77+Huffman */
+	__le32 OriginalPayloadSize; /* accounted when LZNT1, LZ77, LZ77+Huffman */
 } __packed;
 
-/* See MS-SMB2 2.2.42.2 */
-struct smb2_compression_transform_hdr_chained {
-	__le32 ProtocolId;	/* 0xFC 'S' 'M' 'B' */
-	__le32 OriginalCompressedSegmentSize;
-	/* struct compression_payload_header[] */
-} __packed;
-
-/* See MS-SMB2 2.2.42.2.2 */
-struct compression_pattern_payload_v1 {
-	__le16	Pattern;
-	__le16	Reserved1;
+struct smb2_compression_pattern_v1 {
+	__u8	Pattern;
+	__u8	Reserved1;
 	__le16	Reserved2;
 	__le32	Repetitions;
 } __packed;
@@ -273,15 +280,16 @@ struct smb3_blob_data {
 #define SE_GROUP_RESOURCE		0x20000000
 #define SE_GROUP_LOGON_ID		0xC0000000
 
-/* struct sid_attr_data is SidData array in BlobData format then le32 Attr */
-
 struct sid_array_data {
 	__le16 SidAttrCount;
 	/* SidAttrList - array of sid_attr_data structs */
 } __packed;
 
-struct luid_attr_data {
-
+/* struct sid_attr_data is SidData array in BlobData format then le32 Attr */
+struct sid_attr_data {
+	__le16 BlobSize;
+	__u8 BlobData[];
+	/* __le32 Attr */
 } __packed;
 
 /*
@@ -495,6 +503,7 @@ struct smb2_encryption_neg_context {
 #define SMB3_COMPRESS_LZ77_HUFF	cpu_to_le16(0x0003)
 /* Pattern scanning algorithm See MS-SMB2 3.1.4.4.1 */
 #define SMB3_COMPRESS_PATTERN	cpu_to_le16(0x0004) /* Pattern_V1 */
+#define SMB3_COMPRESS_LZ4	cpu_to_le16(0x0005)
 
 /* Compression Flags */
 #define SMB2_COMPRESSION_CAPABILITIES_FLAG_NONE		cpu_to_le32(0x00000000)
@@ -907,6 +916,40 @@ struct smb2_query_directory_rsp {
 	__le32 OutputBufferLength;
 	__u8   Buffer[];
 } __packed;
+
+/* DeviceType Flags */
+#define FILE_DEVICE_CD_ROM              0x00000002
+#define FILE_DEVICE_CD_ROM_FILE_SYSTEM  0x00000003
+#define FILE_DEVICE_DFS                 0x00000006
+#define FILE_DEVICE_DISK                0x00000007
+#define FILE_DEVICE_DISK_FILE_SYSTEM    0x00000008
+#define FILE_DEVICE_FILE_SYSTEM         0x00000009
+#define FILE_DEVICE_NAMED_PIPE          0x00000011
+#define FILE_DEVICE_NETWORK             0x00000012
+#define FILE_DEVICE_NETWORK_FILE_SYSTEM 0x00000014
+#define FILE_DEVICE_NULL                0x00000015
+#define FILE_DEVICE_PARALLEL_PORT       0x00000016
+#define FILE_DEVICE_PRINTER             0x00000018
+#define FILE_DEVICE_SERIAL_PORT         0x0000001b
+#define FILE_DEVICE_STREAMS             0x0000001e
+#define FILE_DEVICE_TAPE                0x0000001f
+#define FILE_DEVICE_TAPE_FILE_SYSTEM    0x00000020
+#define FILE_DEVICE_VIRTUAL_DISK        0x00000024
+#define FILE_DEVICE_NETWORK_REDIRECTOR  0x00000028
+
+/* Device Characteristics */
+#define FILE_REMOVABLE_MEDIA			0x00000001
+#define FILE_READ_ONLY_DEVICE			0x00000002
+#define FILE_FLOPPY_DISKETTE			0x00000004
+#define FILE_WRITE_ONCE_MEDIA			0x00000008
+#define FILE_REMOTE_DEVICE			0x00000010
+#define FILE_DEVICE_IS_MOUNTED			0x00000020
+#define FILE_VIRTUAL_VOLUME			0x00000040
+#define FILE_DEVICE_SECURE_OPEN			0x00000100
+#define FILE_CHARACTERISTIC_TS_DEVICE		0x00001000
+#define FILE_CHARACTERISTIC_WEBDAV_DEVICE	0x00002000
+#define FILE_PORTABLE_DEVICE			0x00004000
+#define FILE_DEVICE_ALLOW_APPCONTAINER_TRAVERSAL 0x00020000
 
 /*
  * Maximum number of iovs we need for a set-info request.

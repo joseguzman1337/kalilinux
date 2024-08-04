@@ -1,3 +1,229 @@
+linux (6.10.3-1) unstable; urgency=medium
+
+  * New upstream stable update:
+    https://www.kernel.org/pub/linux/kernel/v6.x/ChangeLog-6.10.2
+    https://www.kernel.org/pub/linux/kernel/v6.x/ChangeLog-6.10.3
+    - ext4: don't track ranges in fast_commit if inode has inlined data
+      (Closes: #1039883)
+
+  [ Salvatore Bonaccorso ]
+  * [rt] Update to 6.10.2-rt14
+    - Refresh patches and drop patches applied upstream
+  * [arm64] drivers/net/ethernet/microsoft: Enable MICROSOFT_MANA as module
+  * drivers/net/ethernet/pensando: Enable IONIC as module (Closes: #1041893)
+
+  [ Vincent Blut ]
+  * [arm64] drivers/phy/marvell: Enable PHY_MVEBU_CP110_UTMI as module
+    (Closes: #1076934)
+
+  [ Ben Hutchings ]
+  * net: drop bad gso csum_start and offset in virtio_net_hdr (regression in
+    6.10.3)
+  * spi: spidev: Add missing spi_device_id for bh2228fv (regression in 6.10.3)
+
+ -- Ben Hutchings <benh@debian.org>  Sun, 04 Aug 2024 22:10:58 +0200
+
+linux (6.10.1-1~exp1) experimental; urgency=medium
+
+  * New upstream stable update:
+    https://www.kernel.org/pub/linux/kernel/v6.x/ChangeLog-6.10.1
+
+  [ Diederik de Haas ]
+  * [arm64] Add MediaTek MT7986a SoC support
+    - [arm64] drivers/net/ethernet/mediatek: Enable NET_VENDOR_MEDIATEK
+    - [arm64] drivers/net/ethernet/mediatek: Enable NET_MEDIATEK_SOC as module
+    - [arm64] drivers/net/wireless/mediatek/mt76/mt7915: Enable MT798X_WMAC
+    - [arm64] drivers/pwm: Enable PWM_MEDIATEK as module
+    - [arm64] drivers/thermal/mediatek: Enable MTK_SOC_THERMAL as module
+  * [arm64] Add Bananapi BPI-R3 support (Closes: #1072968)
+    - [arm64] drivers/mtd/nand: Enable MTD_NAND_ECC_MEDIATEK as module
+    - [arm64] drivers/mtd/nand/spi: Enable MTD_SPI_NAND as module
+    - [arm64] drivers/net/dsa: Enable NET_DSA_MT7530, NET_DSA_MT7530_MDIO and
+      NET_DSA_MT7530_MMIO as modules
+    - [arm64] drivers/spi: Enable SPI_MTK_SNFI as module
+  * [arm64] Enable support for Pine64's PineTab2:
+    - drivers/iio/accel: Enable IIO_ST_ACCEL_I2C_3AXIS as module
+    - [arm64] drivers/gpu/drm/panel: Enable DRM_PANEL_BOE_TH101MB31UIG002_28A
+      as module
+    - [arm64] drivers/media/i2c: Enable VIDEO_OV5648 and VIDEO_DW9714 as module
+  * [arm64] drivers/gpu/drm/bridge/synopsys: Enable DRM_DW_HDMI_I2S_AUDIO as
+    module
+  * drivers/devfreq: Enable PM_DEVFREQ
+  * [arm64,armhf] drivers/devfreq: Make DEVFREQ_GOV_SIMPLE_ONDEMAND builtin
+
+  [ Emanuele Rocca ]
+  * [arm64] Enable support for Renesas boards RZ/G3S (ARCH_R9A08G045) and
+    RZ/V2H (ARCH_R9A09G057). (Closes: #1072574)
+  * [arm64] Re-enable RELR, kernels built with binutils 2.42.90.20240720 boot
+    fine. (Cf. #1074111).
+
+  [ Bastian Blank ]
+  * [ppc64*] Switch default kernel to 4k page size.  (closes: #1074217)
+  * [ppc64*] Add additional kernel with 64k page size.
+  * Remove unused check for image size.
+  * [arm64] Add additional kernel with 16k page size.
+
+  [ Ben Hutchings ]
+  * d/b/test-patches: Handle kernel release strings without ABI number
+  * d/b/test-patches: Stop looking for featuresets other than rt
+  * d/b/test-patches: Update config overrides for the current format
+  * d/b/buildcheck.py: Restore reading of config to pass to check classes
+  * d/b/buildcheck.py, d/rules.real: Run buildcheck.py in setup as well
+  * d/b/buildcheck.py: Restore config checks on kernels to be signed
+  * [alpha] scsi: Disable SCSI_IMM (fixes FTBFS)
+
+  [ Aurelien Jarno ]
+  * [riscv64] Enable CONFIG_ARCH_CANAAN to support Canaan Kendryte SoCs.
+  * [riscv64] Enable CONFIG_CLK_SOPHGO_CV1800 as a module.
+  * [riscv64] Enable CONFIG_ACPI_CPPC_CPUFREQ as a module.
+
+  [ Vincent Blut ]
+  * [amd64/cloud] drivers/watchdog: Enable I6300ESB_WDT as module
+    (Closes: #1067908)
+  * [x86] drivers/platform/x86: Enable MSI_EC as module
+
+  [ Salvatore Bonaccorso ]
+  * drivers/md/dm-vdo: Enable DM_VDO as module (Closes: #1076457)
+  * drivers/net: Enable NETKIT (BPF-programmable network device) (except for
+    sh4/sh7785lcr) (Closes: #1076962)
+  * fs/erofs: Enable more EROFS compression algorithms (Closes: #1076570)
+    - Enable EROFS_FS_ZIP_LZMA
+    - Enable EROFS_FS_ZIP_DEFLATE
+    - Enable EROFS_FS_ZIP_ZSTD
+
+  [ Richard Hansen ]
+  * [x86] sound/soc/intel/avs/boards: Enable SND_SOC_INTEL_AVS_MACH_MAX98927 as
+    a module (Closes: #1076062)
+
+  [ YunQiang Su ]
+  * [mips64el] Add mips64r6el flavor.
+  * [mips*] Enable R2 to R6 emulator for all R6 flavors.
+
+  [ Sergio Durigan Junior ]
+  * Enable debuginfod support. (Closes: #1072311)
+    libdebuginfod is dual-licensed LGPL-3+ and GPL-2+, which makes it
+    possible for perf to link against the library.
+    - d/rules.d/t/perf/Makefile: Remove NO_LIBDEBUGINFOD=1.
+    - d/templates/tools-unversioned.control.in: B-D on libdebuginfod-dev.
+
+  [ Dmitry Baryshkov ]
+  * [arm64] Enable config options for Qualcomm boards:
+    - Enable INTERCONNECT_QCOM_MSM8996, INTERCONNECT_QCOM_QCM2290,
+      INTERCONNECT_QCOM_SC7280, INTERCONNECT_QCOM_SM6115, and
+      INTERCONNECT_QCOM_SM8250 as built-in, this is required to get serial
+      console early during bootup
+    - Enable pincontrol PINCTRL_MSM8998, PINCTRL_QCM2290, PINCTRL_SC7280,
+      PINCTRL_SC7280_LPASS_LPI, PINCTRL_SM6115, PINCTRL_SM6115_LPASS_LPI,
+      PINCTRL_SM8250, PINCTRL_SM8250_LPASS_LPI as modules
+    - Enable clock controllers MSM_GCC_8998, QCOM_CLK_APCC_MSM8996,
+      QCOM_CLK_APCS_MSM8916, CLK_GFM_LPASS_SM8250, QCM_DISPCC_2290,
+      QCM_GCC_2290, QCOM_A53PLL, SC_CAMCC_7280, SC_DISPCC_7280, SC_GPUCC_7280,
+      SC_LPASS_CORECC_7280, SC_VIDEOCC_7280, SM_CAMCC_8250, SM_DISPCC_6115,
+      SM_DISPCC_8250, SM_GCC_6115, SM_GPUCC_6115, SM_GPUCC_8250,
+      SM_VIDEOCC_8250, SDM_LPASSCC_845 as modules
+    - Enable Audio drivers MFD_WCD934X, SLIM_QCOM_CTRL, SLIM_QCOM_NGD_CTRL,
+      SND_SOC_MSM8916_WCD_ANALOG, SND_SOC_MSM8916_WCD_DIGITAL,
+      SND_SOC_MSM8996, SND_SOC_SC7280, SND_SOC_SDM845, SND_SOC_SM8250,
+      SND_SOC_WCD9335, SND_SOC_WCD934X, SND_SOC_WSA881X as modules
+    - Enable other Qualcomm-specific drivers ARM_QCOM_CPUFREQ_NVMEM,
+      ATH10K_SNOC, CHARGER_QCOM_SMB2, I2C_QCOM_CCI, INTERCONNECT_QCOM_MSM8916,
+      MSM_GPUCC_8998, MSM_MMCC_8998, GPIO_WCD934X, QCOM_IPA,
+      PHY_QCOM_PCIE2, QCOM_GPI_DMA, QCOM_MPM, QCOM_RMTFS_MEM, QCOM_SOCINFO,
+      QCOM_WCNSS_PIL, REGULATOR_QCOM_USB_VBUS, RESET_QCOM_PDC,
+      TYPEC_QCOM_PMIC, UCSI_PMIC_GLINK as modules
+    - Enable DRM_LONTIUM_LT9611, DRM_LONTIUM_LT9611UXC, TYPEC_MUX_NB7VPQ904M
+      as moudles for devices present both on Qualcomm and non-Qualcomm
+      platforms
+  * [arm64] enable CONFIG_QCOM_LMH, another SDM845-related option
+
+  [ Jochen Sprickerhof ]
+  * Enable snd_soc_pcm5102a as a module on armhf/arm64
+
+  [ Dylan Aïssi ]
+  * debian/rules: sort control.md5sums to improve reproducibility
+
+ -- Ben Hutchings <benh@debian.org>  Fri, 26 Jul 2024 17:53:15 +0200
+
+linux (6.10-1~exp1) experimental; urgency=medium
+
+  * New upstream release: https://kernelnewbies.org/Linux_6.10
+
+  [ Ben Hutchings ]
+  * d/l/p/debian_linux/firmware.py: Handle RawFile fields
+  * d/l/p/debian_linux/firmware.py: Correctly handle multiple licences per
+    section
+  * d/l/p/debian_linux/firmware.py: Handle quoted filenames
+  * Update to 6.10:
+    - Drop patches applied upstream:
+      - "alpha: Fix missing symbol versions for str{,n}{cat,cpy}"
+    - Refresh patches:
+      - Adjust context in "Include package version along with kernel release
+        in stack traces"
+      - Adjust context in "Documentation: Drop sphinx version check"
+      - Change "arm64/acpi: Add fixup for HPE m400 quirks" to not restructure
+        acpi_boot_table_init()
+      - Adjust context in "phy/marvell: disable 4-port phys"
+  * [rt] Update to 6.10-rc6-rt11
+  * d/config: Update with the help of kconfigeditor2:
+    - Disable BASE_SMALL instead of enabling BASE_FULL
+    - drm/display: Enable DRM_DISPLAY_DP_AUX_CHARDEV instead of
+      DRM_DP_AUX_CHARDEV
+    - [arm64] Enable USB_ONBOARD_DEV instead of USB_ONBOARD_HUB
+    - [armel,armhf] Enable ARM_PAN instead of CPU_SW_DOMAIN_PAN
+    - [riscv64] Enable ARCH_MICROCHIP, ARCH_SIFIVE, ARCH_VIRT instead of
+      SOC_MICROCHIP_POLARFIRE, SOC_SIFIVE, SOC_VIRT
+    - [x86] drm/display: Enable DRM_DISPLAY_DP_AUX_CEC instead of DRM_DP_CEC
+    - [x86] staging/wlan-ng: Remove PRISM2_USB
+  * hyperv-daemons: Update for upstream removal of hv_fcopy_daemon
+  * [x86] linux-cpupower: Update turbostat Makefile to define BUILD_BUG_HEADER
+  * linux-bpf-dev: Set O to absolute directory in bpftool build
+
+  [ Bastian Blank ]
+  * Use debhelper compatibility level 13.
+  * Add linux-bpf-dev package for BPF header.
+  * Replace dh-exec with static files everywhere.
+
+  [ Punit Agrawal ]
+  * drivers/vfio: Enable VFIO configuration for all supported architectures
+
+ -- Ben Hutchings <benh@debian.org>  Thu, 18 Jul 2024 02:14:35 +0200
+
+linux (6.9.12-1) unstable; urgency=medium
+
+  * New upstream stable update:
+    https://www.kernel.org/pub/linux/kernel/v6.x/ChangeLog-6.9.12
+    - drm/amdgpu: Fix signedness bug in sdma_v4_0_process_trap_irq()
+    - [s390x] mm: Fix VM_FAULT_HWPOISON handling in do_exception()
+    - ocfs2: add bounds checking to ocfs2_check_dir_entry()
+    - jfs: don't walk off the end of ealist
+    - usb: gadget: midi2: Fix incorrect default MIDI2 protocol setup
+    - ALSA: hda/tas2781: Add new quirk for Lenovo Hera2 Laptop
+    - ALSA: hda/realtek: Enable headset mic on Positivo SU C1400
+    - ALSA: hda/realtek: Fix the speaker output on Samsung Galaxy Book Pro 360
+    - [arm64] dts: qcom: sc7180: Disable SuperSpeed instances in park mode
+    - [arm64] dts: qcom: sc7280: Disable SuperSpeed instances in park mode
+    - [arm64] dts: qcom: x1e80100-qcp: Fix USB PHYs regulators
+    - [arm64] dts: qcom: qrb2210-rb1: switch I2C2 to i2c-gpio
+    - [arm64] dts: qcom: qrb4210-rb2: switch I2C2 to i2c-gpio
+    - [arm64] dts: qcom: x1e80100-crd: Fix the PHY regulator for PCIe 6a
+    - [arm64] dts: qcom: x1e80100-qcp: Fix the PHY regulator for PCIe 6a
+    - [arm64] dts: qcom: x1e80100-crd: Fix USB PHYs regulators
+    - [arm64] dts: qcom: msm8996: Disable SS instance in Parkmode for USB
+    - [arm64] dts: qcom: sm6350: Disable SS instance in Parkmode for USB
+    - [arm64] dts: qcom: msm8998: Disable SS instance in Parkmode for USB
+    - [arm64] dts: qcom: ipq6018: Disable SS instance in Parkmode for USB
+    - [arm64] dts: qcom: sdm630: Disable SS instance in Parkmode for USB
+    - [arm64] dts: qcom: ipq8074: Disable SS instance in Parkmode for USB
+    - [arm64] dts: qcom: sdm845: Disable SS instance in Parkmode for USB
+    - [arm64] dts: qcom: sm6115: Disable SS instance in Parkmode for USB
+    - ALSA: pcm_dmaengine: Don't synchronize DMA channel when DMA is paused
+    - ALSA: seq: ump: Skip useless ports for static blocks
+    - filelock: Fix fcntl/close race recovery compat path
+    - tun: add missing verification for short frame (CVE-2024-41091)
+    - tap: add missing verification for short frame (CVE-2024-41090)
+
+ -- Salvatore Bonaccorso <carnil@debian.org>  Sat, 27 Jul 2024 23:52:33 +0200
+
 linux (6.9.11-1) unstable; urgency=medium
 
   * New upstream stable update:

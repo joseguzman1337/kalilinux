@@ -113,7 +113,7 @@ static __cold int io_probe(struct io_ring_ctx *ctx, void __user *arg,
 
 	for (i = 0; i < nr_args; i++) {
 		p->ops[i].op = i;
-		if (!io_issue_defs[i].not_supported)
+		if (io_uring_op_supported(i))
 			p->ops[i].flags = IO_URING_OP_SUPPORTED;
 	}
 	p->ops_len = i;
@@ -370,8 +370,7 @@ static __cold int io_register_iowq_max_workers(struct io_ring_ctx *ctx,
 
 	/* now propagate the restriction to all registered users */
 	list_for_each_entry(node, &ctx->tctx_list, ctx_node) {
-		struct io_uring_task *tctx = node->task->io_uring;
-
+		tctx = node->task->io_uring;
 		if (WARN_ON_ONCE(!tctx->io_wq))
 			continue;
 

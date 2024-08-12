@@ -371,8 +371,6 @@ static void le_scan_disable(struct work_struct *work)
 		goto _return;
 	}
 
-	hdev->discovery.scan_start = 0;
-
 	/* If we were running LE only scan, change discovery state. If
 	 * we were running both LE and BR/EDR inquiry simultaneously,
 	 * and BR/EDR inquiry is already finished, stop discovery,
@@ -6464,7 +6462,7 @@ int hci_le_create_cis_sync(struct hci_dev *hdev)
 		cis->cis_handle = cpu_to_le16(conn->handle);
 		aux_num_cis++;
 
-		if (aux_num_cis >= 0x1f)
+		if (aux_num_cis >= cmd->num_cis)
 			break;
 	}
 	cmd->num_cis = aux_num_cis;

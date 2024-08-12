@@ -452,8 +452,9 @@ static int stm32_pwm_apply(struct pwm_chip *chip, struct pwm_device *pwm,
 
 	enabled = pwm->state.enabled;
 
-	if (enabled && !state->enabled) {
-		stm32_pwm_disable(priv, pwm->hwpwm);
+	if (!state->enabled) {
+		if (enabled)
+			stm32_pwm_disable(priv, pwm->hwpwm);
 		return 0;
 	}
 
@@ -662,11 +663,13 @@ static int stm32_pwm_probe(struct platform_device *pdev)
 	priv->max_arr = ddata->max_arr;
 
 	if (!priv->regmap || !priv->clk)
-		return -EINVAL;
+		return dev_err_probe(dev, -EINVAL, "Failed to get %s\n",
+				     priv->regmap ? "clk" : "regmap");
 
 	ret = stm32_pwm_probe_breakinputs(priv, np);
 	if (ret)
-		return ret;
+		return dev_err_probe(dev, ret,
+				     "Failed to configure breakinputs\n");
 
 	stm32_pwm_detect_complementary(priv);
 
@@ -690,7 +693,8 @@ static int stm32_pwm_probe(struct platform_device *pdev)
 
 	ret = devm_pwmchip_add(dev, chip);
 	if (ret < 0)
-		return ret;
+		return dev_err_probe(dev, ret,
+				     "Failed to register pwmchip\n");
 
 	platform_set_drvdata(pdev, chip);
 

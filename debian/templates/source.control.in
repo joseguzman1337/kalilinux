@@ -5,7 +5,7 @@ Uploaders: Raphaël Hertzog <hertzog@debian.org>, Sophie Brun <sophie@offensive-
 XSBC-Original-Maintainer: Debian Kernel Team <debian-kernel@lists.debian.org>
 Standards-Version: 4.2.0
 Build-Depends:
- debhelper-compat (= 12), dh-exec,
+ debhelper-compat (= 13),
 # used to run debian/bin/*.py
  python3:native,
  python3-dacite:native,

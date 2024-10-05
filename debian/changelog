@@ -1,3 +1,336 @@
+linux (6.11.2-1) unstable; urgency=medium
+
+  * New upstream stable update:
+    https://www.kernel.org/pub/linux/kernel/v6.x/ChangeLog-6.11.1
+    https://www.kernel.org/pub/linux/kernel/v6.x/ChangeLog-6.11.2
+
+  [ Ben Hutchings ]
+  * Revert "perf tools: Use $KBUILD_BUILD_TIMESTAMP as man page date" which is
+    no longer useful
+  * Fix some reproducibility issues (Closes: #1033663):
+    - d/rules.real: Fix missing -ffile-prefix-map options for user-space
+    - linux-perf: Remove remaining source filenames from executable
+    - linux-perf: Work around gcc bug with -ffile-prefix-map and assembly
+      sources
+    - Documentation: Use relative source filenames in ABI documentation
+    - kbuild, bpf: Fix BTF reproducibility
+    - d/rules.real: Add -fdebug-prefix-map option for assembly sources in
+      kernel
+  * d/rules.real: Try harder to set the locale to C.UTF-8
+  * udeb: Delete obsolete configuration for armel/marvell
+  * udeb: Delete obsolete configuration for ide{-core,}-modules, ipv6-modules
+  * udeb: Delete obsolete rtc-modules from kernel-image Provides
+  * udeb: Fold i2c-modules into kernel-image (fixes FTBFS on alpha, sparc64)
+  * udeb: Fold event-modules and mouse-modules into input-modules
+  * udeb: Fold efi-modules into kernel-image
+  * [arm64,armhf] udeb: Fold leds-modules into kernel-image
+  * [amd64] udeb: Fold acpi-modules into kernel-image
+  * [powerpc*] udeb: Fold fancontrol-modules into kernel-image
+  * [alpha] udeb: Fold srm-modules into kernel-image
+  * udeb: Fold crc-modules into kernel-image
+  * [arm64,armhf] udeb: Add all watchdog drivers to kernel-image
+    (Closes: #1081550)
+  * Remove d/b/genorig.py in favour of uscan:
+    - d/salsa-ci.yml: In extract-source, use origtagz instead of genorig.py
+    - d/README.source: Document running uscan instead of genorig.py
+    - d/rules: Expect orig tarballs to be in ../ and never in ../orig/
+
+  [ Salvatore Bonaccorso ]
+  * net/netfilter/ipvs: Enable IP_VS_TWOS as module (Closes: #1082903)
+  * libcpupower: Update symbols file for changes in 6.11.2-1~exp1.
+
+  [ Josua Mayer ]
+  * [arm64] Enable drivers for AM64 SoC on HummingBoard-T (Closes: #1081837)
+  * [arm64] udeb: Add kernel modules for I2C, USB and Ethernet on TI AM64
+  * [arm64] udeb: Add kernel modules for RTC
+
+  [ Jair Gonzalez ]
+  * [amd64] arch/x86: Enable CONFIG_ADDRESS_MASKING
+    (Linear Address Masking support) (Closes: #1082296)
+
+  [ Uwe Kleine-König ]
+  * [armhf] Enable support for GPIOs, i2c, spi and G-sensor for Terasic's
+    DE10-nano board.
+
+ -- Ben Hutchings <benh@debian.org>  Sun, 06 Oct 2024 01:00:02 +0200
+
+linux (6.11-1~exp1) experimental; urgency=medium
+
+  * New upstream release: https://kernelnewbies.org/Linux_6.11
+
+  [ Marcin Juszkiewicz ]
+  * [arm64] udeb: Add kernel modules to get USB/SATA/PCIe working on Rockchip
+    RK3588
+
+  [ Alper Nebi Yasak ]
+  * [arm64] Enable modules for MT8186 Chromebooks
+    - Enable DRM_ITE_IT6505 and I2C_HID_OF_GOODIX as modules
+    - Enable SND_SOC_MT8186_MT6366, SND_SOC_SOF_MT8186 and SND_SOC_MT8186 as
+      modules
+    - Enable SX9324 as a module
+  * udeb: Move i2c-hid-of-goodix module to fb-modules
+
+  [ Dylan Aïssi ]
+  * [arm64] drivers/gpu/drm/panthor: Enable DRM_PANTHOR as module
+
+  [ Dmitry Baryshkov ]
+  * [arm64] Enable SC_CAMCC_8280XP as module, camera clock controller on
+    Lenovo ThinkPad X13s laptop.
+  * [arm64] Enable SC_GCC_8180X, SM_GPUCC_8150, INTERCONNECT_QCOM_SC8180X and
+    PINCTRL_SC8180X as modules in order to support Lenovo Flex 5G laptops.
+  * [arm64] Include modules for Lenovo Flex 5G (Snapdragon SC8180X)
+  * [arm64] enable Qualcomm X Elite modules: CLK_X1E80100_GCC and
+    INTERCONNECT_QCOM_X1E80100 as built-in and CLK_X1E80100_CAMCC,
+    CLK_X1E80100_DISPCC, CLK_X1E80100_GPUCC, CLK_X1E80100_TCSRCC,
+    DRM_PANEL_SAMSUNG_ATNA33XC20, PHY_QCOM_SNPS_EUSB2,
+    PHY_QCOM_EUSB2_REPEATER, PINCTRL_X1E80100 and SND_SOC_X1E80100 as modules.
+  * [arm64] Include modules for Qualcomm X Elite laptops
+
+  [ Diederik de Haas ]
+  * [arm64] Enable additional modules for rk356x devices:
+    - [arm64] drivers/gpu/drm/panel: Enable DRM_PANEL_SITRONIX_ST7789V as
+      module
+    - [arm64] drivers/input/touchscreen: Enable TOUCHSCREEN_ST1232 as module
+    - [arm64] drivers/pci/controller/dwc: Enable PCIE_ROCKCHIP_DW_EP
+    - [arm64] drivers/regulator: Enable REGULATOR_TPS6286X as module
+    - [arm64] drivers/rtc: Enable RTC_DRV_PCF85363 as module
+    - [arm64] drivers/usb/typec: Enable TYPEC_WUSB3801 as module
+    - [arm64] drivers/video/backlight: Enable BACKLIGHT_LM3630A as module
+    - [arm64] sound/soc/codecs: Enable SND_SOC_DMIC and SND_SOC_TAS2562 as
+      module
+  * [arm64] Update rk3588 platform support:
+    - [arm64] drivers/clocksource: Enable ROCKCHIP_TIMER
+    - [arm64] drivers/iommu: Enable IOMMU_IO_PGTABLE_LPAE
+    - [arm64] drivers/mmc/core: Enable PWRSEQ_EMMC
+    - [arm64] drivers/phy/rockchip: Enable PHY_ROCKCHIP_SAMSUNG_HDPTX and
+      PHY_ROCKCHIP_USBDP as module
+  * [rt] Update to 6.11-rt7
+  * d/config: Update with the help of kconfigeditor2
+
+  [ Aurelien Jarno ]
+  * [riscv64] Enable INPUT_MISC (Closes: #1079501).
+
+  [ Bastian Blank ]
+  * Revert "Make linux-libc-dev provide all cross packages".
+
+  [ Helge Deller ]
+  * [hppa] Fix kernel build with CONFIG_DRM=y on parisc64.
+
+  [ Jair Gonzalez ]
+  * [amd64] drivers/crypto/intel/iaa: Enable CRYPTO_DEV_IAA_CRYPTO
+    (IAA Compression Accelerator Crypto Driver) (Closes: #1079272)
+
+  [ Dave Vasilevsky ]
+  * [powerpc] Explicitly disable CRASH_DUMP on 32-bit (Closes: #1079755)
+
+  [ Ben Hutchings ]
+  * [x86] ACPI: Enable ACPI_EC_DEBUGFS as module (Closes: #980555)
+  * [i386] Stop building kernel packages
+  * rtla: Switch to out-of-tree build:
+    - Revert "tools/rtla: Restore option to set VERSION var to VERSION file's
+      contents"
+    - Fix installation from out-of-tree build
+  * rtla: Enable verbose build
+  * rtla: Build with dpkg's recommended compiler flags (regression in 6.9)
+  * rtla: Fix missing debug symbols
+  * rtla: Disable LTO
+  * rtla: Set LD correctly for cross-build
+  * objtool: Build with dpkg's recommended compiler flags (regression in
+    6.5.1-1¬exp1):
+    - Revert "tools build: Clean CFLAGS and LDFLAGS for fixdep"
+    - Update "fixdep: Allow overriding HOSTCC and HOSTLD" to clear the
+      buildflags when overriding
+    - d/rules.d/t/objtool: Put buildflags in the correct variables when
+      recursing
+    - d/rules: Delete blhc ignore regexp for objtool
+
+  [ Miao Wang ]
+  * [loong64] Enable kernel support for LBT instructions.
+  * [loong64] Enable KVM and para-virt support.
+  * [loong64] Enable USB EHCI and OHCI host support.
+
+  [ Yunseong Kim ]
+  * mm/damon: Enable DAMON, DAMON_VADDR, DAMON_PADDR, DAMON_SYSFS,
+    DAMON_RECLAIM, DAMON_LRU_SORT
+
+  [ Miguel Bernal Marin ]
+  * [x86] linux-cpupower: Add intel-speed-select command (Closes: #1036714)
+
+  [ Vincent Blut ]
+  * drivers/net/wireless: Support some Wi-Fi 7 devices: enable ATH12K,
+    MT7925E, MT7925U, MT7996E and RTW89_8922AE as modules (Closes: #1081114)
+
+  [ Emanuele Rocca ]
+  * mm: set CONFIG_ZONE_DEVICE=y on arm64, loong64, ppc64, ppc64el, and
+    riscv64, not only amd64. FS_DAX depends on it.
+
+ -- Ben Hutchings <benh@debian.org>  Thu, 19 Sep 2024 18:42:39 +0200
+
+linux (6.11~rc5-1~exp1) experimental; urgency=medium
+
+  * New upstream release candidate
+
+  [ Ben Hutchings ]
+  * perf python: Fix the build on 32-bit arm by including missing
+    "util/sample.h" (fixes FTBFS on many architectures)
+
+  [ Aurelien Jarno ]
+  * [riscv64] udeb: Add rtc-modules to Provides of kernel-image
+  * [riscv64] udeb: Ship mtd in kernel-image, drop mtd-core-modules and
+    add it to to Provides of kernel-image.
+
+ -- Ben Hutchings <benh@debian.org>  Tue, 27 Aug 2024 12:59:49 +0200
+
+linux (6.11~rc4-1~exp1) experimental; urgency=medium
+
+  * New upstream release candidate
+    - 9p: Fix DIO read through netfs (Closes: #1072004)
+
+  [ Bastian Blank ]
+  * Properly disable common headers packages
+
+  [ Joel Stanley ]
+  * [x86] Enable IPU6 MIPI drivers for Intel Alder Lake laptops
+    (Closes: #994449, #1074441, #1060262, #1078170)
+
+  [ Ben Hutchings ]
+  * Drop "module: Avoid ABI changes when debug info is disabled" as we no
+    longer try to maintain a module ABI
+  * Update to 6.11:
+    - Drop patches applied upstream:
+      - "net: drop bad gso csum_start and offset in virtio_net_hdr"
+    - Refresh patches:
+      - Adjust context in "fs: Add MODULE_SOFTDEP declarations for hard-coded
+        crypto drivers"
+      - Adjust context in "arm64/acpi: Add fixup for HPE m400 quirks"
+      - Adjust context in "add sysctl to disallow unprivileged CLONE_NEWUSER by
+        default"
+      - Update "Export symbols needed by Android drivers":
+        - Update description to say this is only for binder and Waydroid
+        - Add and remove exports to match what binder currently uses
+      - Adjust context in "Tweak gitignore for Debian pkg-kernel using git"
+      - Update "Use RELAXED ieee754 mode for Loongson-3 as 3A 4000 is 2008-
+        only" for addition of EMULATED mode
+      - Update "Include package version along with kernel release in stack
+        traces" for addition of UID in dump_stack_print_info()
+      - Adjust context in "security,perf: Allow further restriction of
+        perf_event_open"
+  * [rt] Update to 6.11-rc3-rt3
+  * d/rules.real: Unset KBUILD_HOSTCFLAGS etc. instead of overriding to be
+    empty
+  * d/rules.d/Makefile.inc: Add scripts/include to header include path
+  * d/config: Update with the help of kconfigeditor2:
+    - hwmon: Enable SENSORS_LM90 (where not already enabled) instead of
+      SENSORS_ADM1021 and SENSORS_MAX6642
+    - [arm64] acpi/numa: Remove ACPI_NUMA which is now enabled automatically
+    - debug: Remove TEST_USER_COPY
+    - fs/netfs: Disable NETFS_DEBUG instead of FSCACHE_DEBUG
+    - memstick: Remove MEMSTICK_REALTEK_PCI
+    - [armhf] sound/soc/fsl: Remove SND_SOC_IMX_SPDIF which became redundant
+      with SND_SOC_FSL_ASOC_CARD
+    - staging/media/av7110: Remove DVB_BUDGET_PATCH
+  * perf tools: Pass EXTRA_CFLAGS through to libbpf build again
+  * d/config: Fix broken configs that were being resolved differently by
+    kconfig:
+    - [hppa/parisc64] Enable FLATMEM_MANUAL
+    - [riscv64] Enable KERNEL_GZIP instead of KERNEL_XZ
+    - [x86] Enable CPU_FREQ_DEFAULT_GOV_SCHEDUTIL instead of
+      CPU_FREQ_DEFAULT_GOV_ONDEMAND or CPU_FREQ_DEFAULT_GOV_PERFORMANCE
+  * d/control: Drop versions from Build-Depends that are satisfied since buster
+  * d/control: Fix profiles for Build-Depends on bison, cpio, flex, xz-utils
+  * d/control: Move bison, cpio, flex, xz-utils to Build-Depends-{Arch,Indep}
+
+  [ Salvatore Bonaccorso ]
+  * Compile with gcc-14 on all architectures
+
+  [ Dmitry Baryshkov ]
+  * [arm64] Include modules for Lenovo Yoga C630 and Lenovo Miix 630 into D-I
+    packages.
+
+  [ Jing Luo ]
+  * [ia64] Purge ia64 from installer
+
+  [ Aurelien Jarno ]
+  * [riscv64] Enable STARFIVE_STARLINK_CACHE and PCIE_STARFIVE_HOST.
+  * [riscv64] Enable PHY_STARFIVE_JH7110_DPHY_TX as a module.
+  * [riscv64] Enable CLK_SOPHGO_SG2042_PLL, CLK_SOPHGO_SG2042_CLKGEN and
+    CLK_SOPHGO_SG2042_RPGATE as modules.
+
+  [ Jair Gonzalez ]
+  * [amd64] tools/arch/x86/intel_sdsi: Add intel-sdsi package for Intel SDSi
+    provisioning tool (Closes: #1059362)
+  * [amd64] drivers/accel/habanalabs: Enable DRM_ACCEL_HABANALABS
+    (Habana's AI Processors)
+  * [amd64] drivers/accel/ivpu: Enable DRM_ACCEL_IVPU (Intel NPU, formerly
+    called Intel VPU) (Closes: #1079170)
+
+  [ Zhang Ning ]
+  * [x86] Enable GPIO_WHISKEY_COVE, INTEL_BXT_PMIC_THERMAL as module.
+
+ -- Ben Hutchings <benh@debian.org>  Wed, 21 Aug 2024 17:13:14 +0200
+
+linux (6.10.12-1) unstable; urgency=medium
+
+  * New upstream stable update:
+    https://www.kernel.org/pub/linux/kernel/v6.x/ChangeLog-6.10.12
+    - [arm64] ASoC: SOF: mediatek: Add missing board compatible
+    - [x86] ASoC: allow module autoloading for table board_ids
+    - ALSA: hda/realtek - Fixed ALC256 headphone no sound
+    - ALSA: hda/realtek - FIxed ALC285 headphone no sound
+    - scsi: lpfc: Fix overflow build issue
+    - [x86] hwmon: (asus-ec-sensors) remove VRM temp X570-E GAMING
+    - [x86] platform/x86: asus-wmi: Fix spurious rfkill on UX8406MA
+    - [x86] platform/x86: x86-android-tablets: Make Lenovo Yoga Tab 3 X90F DMI
+      match less strict
+    - [armhf] net: ftgmac100: Ensure tx descriptor updates are visible
+    - wifi: iwlwifi: lower message level for FW buffer destination
+    - wifi: iwlwifi: mvm: fix iwl_mvm_scan_fits() calculation
+    - wifi: iwlwifi: mvm: fix iwl_mvm_max_scan_ie_fw_cmd_room()
+    - wifi: iwlwifi: mvm: pause TCM when the firmware is stopped
+    - wifi: iwlwifi: mvm: don't wait for tx queues if firmware is dead
+    - wifi: mac80211: free skb on error path in ieee80211_beacon_get_ap()
+    - wifi: iwlwifi: clear trans->state earlier upon error
+    - [arm64] can: m_can: Limit coalescing to peripheral instances
+    - can: mcp251xfd: mcp251xfd_ring_init(): check TX-coalescing configuration
+    - [x86] ASoC: Intel: soc-acpi-cht: Make Lenovo Yoga Tab 3 X90F DMI match
+      less strict
+    - [x86] ASoC: intel: fix module autoloading
+    - spi: spidev: Add an entry for elgin,jg10309-01
+    - [x86] ASoC: amd: yc: Add a quirk for MSI Bravo 17 (D7VEK)
+    - ALSA: hda: add HDMI codec ID for Intel PTL
+    - smb: client: fix hang in wait_for_response() for negproto
+    - [x86] platform/x86/amd: pmf: Make ASUS GA403 quirk generic
+    - ice: check for XDP rings instead of bpf program when unconfiguring
+    - [x86] hyperv: Set X86_FEATURE_TSC_KNOWN_FREQ when Hyper-V provides
+      frequency
+    - tools: hv: rm .*.cmd when make clean
+    - spi: spidev: Add missing spi_device_id for jg10309-01
+    - ocfs2: add bounds checking to ocfs2_xattr_find_entry()
+    - ocfs2: strict bound check before memcmp in ocfs2_xattr_find_entry()
+      (CVE-2024-41016)
+    - drm: Use XArray instead of IDR for minors
+    - accel: Use XArray instead of IDR for minors
+    - drm: Expand max DRM device number to full MINORBITS
+    - [x86] powercap/intel_rapl: Add support for AMD family 1Ah
+    - [x86] powercap/intel_rapl: Fix the energy-pkg event for AMD CPUs
+    - netfilter: nft_socket: make cgroupsv2 matching work with namespaces
+    - netfilter: nft_socket: Fix a NULL vs IS_ERR() bug in
+      nft_socket_cgroup_subtree_level()
+    - Bluetooth: btintel_pcie: Allocate memory for driver private data
+      (CVE-2024-46869)
+    - nvme-pci: qdepth 1 quirk
+    - can: mcp251xfd: properly indent labels
+    - can: mcp251xfd: move mcp251xfd_timestamp_start()/stop() into
+      mcp251xfd_chip_start/stop()
+    - USB: serial: pl2303: add device id for Macrosilicon MS3020
+    - USB: usbtmc: prevent kernel-usb-infoleak
+    - [x86] powercap: intel_rapl: Change an error pointer to NULL
+
+  [ Helge Deller ]
+  * [hppa] Fix kernel build with CONFIG_DRM=y on parisc64.
+
+ -- Salvatore Bonaccorso <carnil@debian.org>  Tue, 01 Oct 2024 19:08:55 +0200
+
 linux (6.10.11-1) unstable; urgency=medium
 
   * New upstream stable update:

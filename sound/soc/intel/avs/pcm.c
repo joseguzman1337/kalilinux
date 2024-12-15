@@ -490,16 +490,6 @@ static int hw_rule_param_size(struct snd_pcm_hw_params *params, struct snd_pcm_h
 static int avs_pcm_hw_constraints_init(struct snd_pcm_substream *substream)
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
-	static const unsigned int rates[] = {
-		8000, 11025, 12000, 16000,
-		22050, 24000, 32000, 44100,
-		48000, 64000, 88200, 96000,
-		128000, 176400, 192000,
-	};
-	static const struct snd_pcm_hw_constraint_list rate_list = {
-		.count = ARRAY_SIZE(rates),
-		.list = rates,
-	};
 	int ret;
 
 	ret = snd_pcm_hw_constraint_integer(runtime, SNDRV_PCM_HW_PARAM_PERIODS);
@@ -511,10 +501,6 @@ static int avs_pcm_hw_constraints_init(struct snd_pcm_substream *substream)
 	if (ret < 0)
 		return ret;
 
-	ret = snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_RATE, &rate_list);
-	if (ret < 0)
-		return ret;
-
 	/* Adjust buffer and period size based on the audio format. */
 	snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_BUFFER_SIZE, hw_rule_param_size, NULL,
 			    SNDRV_PCM_HW_PARAM_FORMAT, SNDRV_PCM_HW_PARAM_CHANNELS,
@@ -523,7 +509,7 @@ static int avs_pcm_hw_constraints_init(struct snd_pcm_substream *substream)
 			    SNDRV_PCM_HW_PARAM_FORMAT, SNDRV_PCM_HW_PARAM_CHANNELS,
 			    SNDRV_PCM_HW_PARAM_RATE, -1);
 
-	return ret;
+	return 0;
 }
 
 static int avs_dai_fe_startup(struct snd_pcm_substream *substream, struct snd_soc_dai *dai)
@@ -1351,7 +1337,9 @@ static const struct snd_soc_dai_driver i2s_dai_template = {
 		.channels_min	= 1,
 		.channels_max	= 8,
 		.rates		= SNDRV_PCM_RATE_8000_192000 |
-				  SNDRV_PCM_RATE_KNOT,
+				  SNDRV_PCM_RATE_12000 |
+				  SNDRV_PCM_RATE_24000 |
+				  SNDRV_PCM_RATE_128000,
 		.formats	= SNDRV_PCM_FMTBIT_S16_LE |
 				  SNDRV_PCM_FMTBIT_S32_LE,
 		.subformats	= SNDRV_PCM_SUBFMTBIT_MSBITS_20 |
@@ -1362,7 +1350,9 @@ static const struct snd_soc_dai_driver i2s_dai_template = {
 		.channels_min	= 1,
 		.channels_max	= 8,
 		.rates		= SNDRV_PCM_RATE_8000_192000 |
-				  SNDRV_PCM_RATE_KNOT,
+				  SNDRV_PCM_RATE_12000 |
+				  SNDRV_PCM_RATE_24000 |
+				  SNDRV_PCM_RATE_128000,
 		.formats	= SNDRV_PCM_FMTBIT_S16_LE |
 				  SNDRV_PCM_FMTBIT_S32_LE,
 		.subformats	= SNDRV_PCM_SUBFMTBIT_MSBITS_20 |

@@ -798,6 +798,7 @@ static void init_amd_bd(struct cpuinfo_x86 *c)
 static const struct x86_cpu_desc erratum_1386_microcode[] = {
 	AMD_CPU_DESC(0x17,  0x1, 0x2, 0x0800126e),
 	AMD_CPU_DESC(0x17, 0x31, 0x0, 0x08301052),
+	{},
 };
 
 static void fix_erratum_1386(struct cpuinfo_x86 *c)
@@ -1064,7 +1065,7 @@ static void init_amd(struct cpuinfo_x86 *c)
 	 */
 	if (spectre_v2_in_eibrs_mode(spectre_v2_enabled) &&
 	    cpu_has(c, X86_FEATURE_AUTOIBRS))
-		WARN_ON_ONCE(msr_set_bit(MSR_EFER, _EFER_AUTOIBRS));
+		WARN_ON_ONCE(msr_set_bit(MSR_EFER, _EFER_AUTOIBRS) < 0);
 
 	/* AMD CPUs don't need fencing after x2APIC/TSC_DEADLINE MSR writes. */
 	clear_cpu_cap(c, X86_FEATURE_APIC_MSRS_FENCE);
@@ -1200,22 +1201,6 @@ unsigned long amd_get_dr_addr_mask(unsigned int dr)
 	return per_cpu(amd_dr_addr_mask[dr], smp_processor_id());
 }
 EXPORT_SYMBOL_GPL(amd_get_dr_addr_mask);
-
-u32 amd_get_highest_perf(void)
-{
-	struct cpuinfo_x86 *c = &boot_cpu_data;
-
-	if (c->x86 == 0x17 && ((c->x86_model >= 0x30 && c->x86_model < 0x40) ||
-			       (c->x86_model >= 0x70 && c->x86_model < 0x80)))
-		return 166;
-
-	if (c->x86 == 0x19 && ((c->x86_model >= 0x20 && c->x86_model < 0x30) ||
-			       (c->x86_model >= 0x40 && c->x86_model < 0x70)))
-		return 166;
-
-	return 255;
-}
-EXPORT_SYMBOL_GPL(amd_get_highest_perf);
 
 static void zenbleed_check_cpu(void *unused)
 {

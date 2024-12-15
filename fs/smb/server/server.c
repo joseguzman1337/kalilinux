@@ -15,7 +15,7 @@
 
 #include "server.h"
 #include "smb_common.h"
-#include "smbstatus.h"
+#include "../common/smb2status.h"
 #include "connection.h"
 #include "transport_ipc.h"
 #include "mgmt/user_session.h"
@@ -276,13 +276,17 @@ static void handle_ksmbd_work(struct work_struct *wk)
 	 * disconnection. waitqueue_active is safe because it
 	 * uses atomic operation for condition.
 	 */
+	atomic_inc(&conn->refcnt);
 	if (!atomic_dec_return(&conn->r_count) && waitqueue_active(&conn->r_count_q))
 		wake_up(&conn->r_count_q);
+
+	if (atomic_dec_and_test(&conn->refcnt))
+		kfree(conn);
 }
 
 /**
  * queue_ksmbd_work() - queue a smb request to worker thread queue
- *		for proccessing smb command and sending response
+ *		for processing smb command and sending response
  * @conn:	connection instance
  *
  * read remaining data from socket create and submit work.

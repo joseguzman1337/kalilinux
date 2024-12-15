@@ -40,7 +40,7 @@
 #include <linux/execmem.h>
 
 #include <asm/barrier.h>
-#include <asm/unaligned.h>
+#include <linux/unaligned.h>
 
 /* Registers */
 #define BPF_R0	regs[BPF_REG_0]
@@ -131,6 +131,7 @@ struct bpf_prog *bpf_prog_alloc_no_stats(unsigned int size, gfp_t gfp_extra_flag
 	INIT_LIST_HEAD_RCU(&fp->aux->ksym_prefix.lnode);
 #endif
 	mutex_init(&fp->aux->used_maps_mutex);
+	mutex_init(&fp->aux->ext_mutex);
 	mutex_init(&fp->aux->dst_mutex);
 
 	return fp;

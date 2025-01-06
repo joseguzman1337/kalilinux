@@ -1,6 +1,6 @@
 #!/bin/sh -e
 
-version=6.11.10-cloud-arm64
+version=6.12.8-arm64
 image_path=/boot/vmlinuz-$version
 
 if [ "$1" != remove ]; then

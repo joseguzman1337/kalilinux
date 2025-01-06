@@ -9,7 +9,7 @@ sources.
 
 --- a/scripts/Makefile.build
 +++ b/scripts/Makefile.build
-@@ -209,6 +209,11 @@ cmd_record_mcount = $(if $(findstring $(
+@@ -210,6 +210,11 @@ cmd_record_mcount = $(if $(findstring $(
  	$(sub_cmd_record_mcount))
  endif # CONFIG_FTRACE_MCOUNT_USE_RECORDMCOUNT
  

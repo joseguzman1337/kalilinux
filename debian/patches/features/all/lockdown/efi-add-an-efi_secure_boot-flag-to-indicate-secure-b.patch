@@ -31,7 +31,7 @@ cc: linux-efi@vger.kernel.org
 
 --- a/arch/x86/kernel/setup.c
 +++ b/arch/x86/kernel/setup.c
-@@ -1189,19 +1189,7 @@ void __init setup_arch(char **cmdline_p)
+@@ -1193,19 +1193,7 @@ void __init setup_arch(char **cmdline_p)
  	/* Allocate bigger log buffer */
  	setup_log_buf(1);
  
@@ -54,7 +54,7 @@ cc: linux-efi@vger.kernel.org
  
 --- a/drivers/firmware/efi/Makefile
 +++ b/drivers/firmware/efi/Makefile
-@@ -25,6 +25,7 @@ subdir-$(CONFIG_EFI_STUB)		+= libstub
+@@ -25,6 +25,7 @@ obj-$(CONFIG_EFI_FAKE_MEMMAP)		+= fake_m
  obj-$(CONFIG_EFI_BOOTLOADER_CONTROL)	+= efibc.o
  obj-$(CONFIG_EFI_TEST)			+= test/
  obj-$(CONFIG_EFI_DEV_PATH_PARSER)	+= dev-path-parser.o

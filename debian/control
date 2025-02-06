@@ -657,7 +657,7 @@ Package: linux-headers-amd64
 Architecture: amd64
 Build-Profiles: <!pkg.linux.nokernel !pkg.linux.nometa !pkg.linux.quick>
 Provides: linux-headers-generic
-Depends: linux-headers-6.12.8-amd64 (= ${binary:Version}), ${misc:Depends}
+Depends: linux-headers-6.12.11-amd64 (= ${binary:Version}), ${misc:Depends}
 Description: Header files for Linux amd64 configuration (meta-package)
  This package depends on the architecture-specific header files for the
  latest Linux kernel amd64 configuration.
@@ -666,7 +666,7 @@ Package: linux-headers-arm64
 Architecture: arm64
 Build-Profiles: <!pkg.linux.nokernel !pkg.linux.nometa !pkg.linux.quick>
 Provides: linux-headers-generic
-Depends: linux-headers-6.12.8-arm64 (= ${binary:Version}), ${misc:Depends}
+Depends: linux-headers-6.12.11-arm64 (= ${binary:Version}), ${misc:Depends}
 Description: Header files for Linux arm64 configuration (meta-package)
  This package depends on the architecture-specific header files for the
  latest Linux kernel arm64 configuration.
@@ -674,7 +674,7 @@ Description: Header files for Linux arm64 configuration (meta-package)
 Package: linux-headers-arm64-16k
 Architecture: arm64
 Build-Profiles: <!pkg.linux.nokernel !pkg.linux.nometa !pkg.linux.quick>
-Depends: linux-headers-6.12.8-arm64-16k (= ${binary:Version}), ${misc:Depends}
+Depends: linux-headers-6.12.11-arm64-16k (= ${binary:Version}), ${misc:Depends}
 Description: Header files for Linux arm64-16k configuration (meta-package)
  This package depends on the architecture-specific header files for the
  latest Linux kernel arm64-16k configuration.
@@ -699,7 +699,7 @@ Description: Header files for Linux armmp-lpae configuration (meta-package)
 Package: linux-headers-cloud-amd64
 Architecture: amd64
 Build-Profiles: <!pkg.linux.nokernel !pkg.linux.nometa>
-Depends: linux-headers-6.12.8-cloud-amd64 (= ${binary:Version}), ${misc:Depends}
+Depends: linux-headers-6.12.11-cloud-amd64 (= ${binary:Version}), ${misc:Depends}
 Description: Header files for Linux cloud-amd64 configuration (meta-package)
  This package depends on the architecture-specific header files for the
  latest Linux kernel cloud-amd64 configuration.
@@ -707,7 +707,7 @@ Description: Header files for Linux cloud-amd64 configuration (meta-package)
 Package: linux-headers-cloud-arm64
 Architecture: arm64
 Build-Profiles: <!pkg.linux.nokernel !pkg.linux.nometa>
-Depends: linux-headers-6.12.8-cloud-arm64 (= ${binary:Version}), ${misc:Depends}
+Depends: linux-headers-6.12.11-cloud-arm64 (= ${binary:Version}), ${misc:Depends}
 Description: Header files for Linux cloud-arm64 configuration (meta-package)
  This package depends on the architecture-specific header files for the
  latest Linux kernel cloud-arm64 configuration.
@@ -873,7 +873,7 @@ Description: Header files for Linux rpi configuration (meta-package)
 Package: linux-headers-rt-amd64
 Architecture: amd64
 Build-Profiles: <!pkg.linux.nokernel !pkg.linux.nometa !pkg.linux.quick>
-Depends: linux-headers-6.12.8-rt-amd64 (= ${binary:Version}), ${misc:Depends}
+Depends: linux-headers-6.12.11-rt-amd64 (= ${binary:Version}), ${misc:Depends}
 Description: Header files for Linux rt-amd64 configuration (meta-package)
  This package depends on the architecture-specific header files for the
  latest Linux kernel rt-amd64 configuration.
@@ -881,7 +881,7 @@ Description: Header files for Linux rt-amd64 configuration (meta-package)
 Package: linux-headers-rt-arm64
 Architecture: arm64
 Build-Profiles: <!pkg.linux.nokernel !pkg.linux.nometa !pkg.linux.quick>
-Depends: linux-headers-6.12.8-rt-arm64 (= ${binary:Version}), ${misc:Depends}
+Depends: linux-headers-6.12.11-rt-arm64 (= ${binary:Version}), ${misc:Depends}
 Description: Header files for Linux rt-arm64 configuration (meta-package)
  This package depends on the architecture-specific header files for the
  latest Linux kernel rt-arm64 configuration.
@@ -1054,8 +1054,7 @@ Description: Debug symbols for linux-image-6.12.11-alpha-smp
  This package provides the detached debug symbols for the Linux kernel and
  modules in linux-image-6.12.11-alpha-smp.
 
-<<<<<<< HEAD
-Package: linux-image-6.12.8-amd64
+Package: linux-image-6.12.11-amd64
 Architecture: amd64
 Build-Profiles: <!pkg.linux.nokernel !pkg.linux.quick>
 Depends: kmod, linux-base (>= 4.3~), ${misc:Depends}, initramfs-tools (>= 0.120+deb8u2) [amd64] | linux-initramfs-tool [amd64]
@@ -1066,10 +1065,7 @@ Description: Linux 6.12 for 64-bit PCs
  The Linux kernel 6.12 and modules for use on PCs with AMD64, Intel 64 or
  VIA Nano processors.
 
-Package: linux-image-6.12.8-amd64-dbg
-=======
 Package: linux-image-6.12.11-amd64-dbg
->>>>>>> debian
 Architecture: amd64
 Section: debug
 Priority: optional
@@ -1079,8 +1075,7 @@ Description: Debug symbols for linux-image-6.12.11-amd64
  This package provides the detached debug symbols for the Linux kernel and
  modules in linux-image-6.12.11-amd64.
 
-<<<<<<< HEAD
-Package: linux-image-6.12.8-arm64
+Package: linux-image-6.12.11-arm64
 Architecture: arm64
 Build-Profiles: <!pkg.linux.nokernel !pkg.linux.quick>
 Depends: kmod, linux-base (>= 4.3~), ${misc:Depends}, initramfs-tools (>= 0.120+deb8u2) [arm64] | linux-initramfs-tool [arm64]
@@ -1090,7 +1085,7 @@ Breaks: fwupdate (<< 12-7) [arm64], wireless-regdb (<< 2019.06.03-1~) [arm64], i
 Description: Linux 6.12 for 64-bit ARMv8 machines
  The Linux kernel 6.12 and modules for use on 64-bit ARMv8 machines.
 
-Package: linux-image-6.12.8-arm64-16k
+Package: linux-image-6.12.11-arm64-16k
 Architecture: arm64
 Build-Profiles: <!pkg.linux.nokernel !pkg.linux.quick>
 Depends: kmod, linux-base (>= 4.3~), ${misc:Depends}, initramfs-tools (>= 0.120+deb8u2) [arm64] | linux-initramfs-tool [arm64]
@@ -1100,20 +1095,6 @@ Breaks: fwupdate (<< 12-7) [arm64], wireless-regdb (<< 2019.06.03-1~) [arm64], i
 Description: Linux 6.12 for 64-bit ARMv8 machines with 16k pages
  The Linux kernel 6.12 and modules for use on 64-bit ARMv8 machines with
  16k pages.
-=======
-Package: linux-image-6.12.11-amd64-unsigned
-Architecture: amd64
-Build-Profiles: <!pkg.linux.nokernel !pkg.linux.quick>
-Depends: kmod, linux-base (>= 4.3~), ${misc:Depends}, initramfs-tools (>= 0.120+deb8u2) [amd64] | linux-initramfs-tool [amd64]
-Recommends: apparmor [amd64]
-Suggests: firmware-linux-free, linux-doc-6.12, debian-kernel-handbook, grub-pc [amd64] | grub-efi-amd64 [amd64] | extlinux [amd64]
-Replaces: linux-image-6.12.11-amd64
-Breaks: fwupdate (<< 12-7) [amd64], wireless-regdb (<< 2019.06.03-1~) [amd64], initramfs-tools (<< 0.120+deb8u2) [amd64]
-Conflicts: linux-image-6.12.11-amd64
-Description: Linux 6.12 for 64-bit PCs
- The Linux kernel 6.12 and modules for use on PCs with AMD64, Intel 64 or
- VIA Nano processors.
->>>>>>> debian
 
 Package: linux-image-6.12.11-arm64-16k-dbg
 Architecture: arm64
@@ -1125,24 +1106,7 @@ Description: Debug symbols for linux-image-6.12.11-arm64-16k
  This package provides the detached debug symbols for the Linux kernel and
  modules in linux-image-6.12.11-arm64-16k.
 
-<<<<<<< HEAD
-Package: linux-image-6.12.8-arm64-dbg
-=======
-Package: linux-image-6.12.11-arm64-16k-unsigned
-Architecture: arm64
-Build-Profiles: <!pkg.linux.nokernel !pkg.linux.quick>
-Depends: kmod, linux-base (>= 4.3~), ${misc:Depends}, initramfs-tools (>= 0.120+deb8u2) [arm64] | linux-initramfs-tool [arm64]
-Recommends: apparmor [arm64]
-Suggests: firmware-linux-free, linux-doc-6.12, debian-kernel-handbook
-Replaces: linux-image-6.12.11-arm64-16k
-Breaks: fwupdate (<< 12-7) [arm64], wireless-regdb (<< 2019.06.03-1~) [arm64], initramfs-tools (<< 0.120+deb8u2) [arm64]
-Conflicts: linux-image-6.12.11-arm64-16k
-Description: Linux 6.12 for 64-bit ARMv8 machines with 16k pages
- The Linux kernel 6.12 and modules for use on 64-bit ARMv8 machines with
- 16k pages.
-
 Package: linux-image-6.12.11-arm64-dbg
->>>>>>> debian
 Architecture: arm64
 Section: debug
 Priority: optional
@@ -1152,23 +1116,7 @@ Description: Debug symbols for linux-image-6.12.11-arm64
  This package provides the detached debug symbols for the Linux kernel and
  modules in linux-image-6.12.11-arm64.
 
-<<<<<<< HEAD
-Package: linux-image-6.12.8-armmp
-=======
-Package: linux-image-6.12.11-arm64-unsigned
-Architecture: arm64
-Build-Profiles: <!pkg.linux.nokernel !pkg.linux.quick>
-Depends: kmod, linux-base (>= 4.3~), ${misc:Depends}, initramfs-tools (>= 0.120+deb8u2) [arm64] | linux-initramfs-tool [arm64]
-Recommends: apparmor [arm64]
-Suggests: firmware-linux-free, linux-doc-6.12, debian-kernel-handbook
-Replaces: linux-image-6.12.11-arm64
-Breaks: fwupdate (<< 12-7) [arm64], wireless-regdb (<< 2019.06.03-1~) [arm64], initramfs-tools (<< 0.120+deb8u2) [arm64]
-Conflicts: linux-image-6.12.11-arm64
-Description: Linux 6.12 for 64-bit ARMv8 machines
- The Linux kernel 6.12 and modules for use on 64-bit ARMv8 machines.
-
 Package: linux-image-6.12.11-armmp
->>>>>>> debian
 Architecture: armhf
 Build-Profiles: <!pkg.linux.nokernel>
 Depends: kmod, linux-base (>= 4.3~), ${misc:Depends}, initramfs-tools (>= 0.120+deb8u2) [armhf] | linux-initramfs-tool [armhf]
@@ -1212,8 +1160,7 @@ Description: Debug symbols for linux-image-6.12.11-armmp-lpae
  This package provides the detached debug symbols for the Linux kernel and
  modules in linux-image-6.12.11-armmp-lpae.
 
-<<<<<<< HEAD
-Package: linux-image-6.12.8-cloud-amd64
+Package: linux-image-6.12.11-cloud-amd64
 Architecture: amd64
 Build-Profiles: <!pkg.linux.nokernel>
 Depends: kmod, linux-base (>= 4.3~), ${misc:Depends}, initramfs-tools (>= 0.120+deb8u2) [amd64] | linux-initramfs-tool [amd64]
@@ -1224,10 +1171,7 @@ Description: Linux 6.12 for x86-64 cloud
  The Linux kernel 6.12 and modules for use on cloud platforms including
  Amazon EC2, Microsoft Azure, and Google Compute Engine.
 
-Package: linux-image-6.12.8-cloud-amd64-dbg
-=======
 Package: linux-image-6.12.11-cloud-amd64-dbg
->>>>>>> debian
 Architecture: amd64
 Section: debug
 Priority: optional
@@ -1237,8 +1181,7 @@ Description: Debug symbols for linux-image-6.12.11-cloud-amd64
  This package provides the detached debug symbols for the Linux kernel and
  modules in linux-image-6.12.11-cloud-amd64.
 
-<<<<<<< HEAD
-Package: linux-image-6.12.8-cloud-arm64
+Package: linux-image-6.12.11-cloud-arm64
 Architecture: arm64
 Build-Profiles: <!pkg.linux.nokernel>
 Depends: kmod, linux-base (>= 4.3~), ${misc:Depends}, initramfs-tools (>= 0.120+deb8u2) [arm64] | linux-initramfs-tool [arm64]
@@ -1248,20 +1191,6 @@ Breaks: fwupdate (<< 12-7) [arm64], wireless-regdb (<< 2019.06.03-1~) [arm64], i
 Description: Linux 6.12 for arm64 cloud
  The Linux kernel 6.12 and modules for use on cloud platforms supporting
  arm64 virtual machines.
-=======
-Package: linux-image-6.12.11-cloud-amd64-unsigned
-Architecture: amd64
-Build-Profiles: <!pkg.linux.nokernel>
-Depends: kmod, linux-base (>= 4.3~), ${misc:Depends}, initramfs-tools (>= 0.120+deb8u2) [amd64] | linux-initramfs-tool [amd64]
-Recommends: apparmor [amd64]
-Suggests: firmware-linux-free, linux-doc-6.12, debian-kernel-handbook, grub-pc [amd64] | grub-efi-amd64 [amd64] | extlinux [amd64]
-Replaces: linux-image-6.12.11-cloud-amd64
-Breaks: fwupdate (<< 12-7) [amd64], wireless-regdb (<< 2019.06.03-1~) [amd64], initramfs-tools (<< 0.120+deb8u2) [amd64]
-Conflicts: linux-image-6.12.11-cloud-amd64
-Description: Linux 6.12 for x86-64 cloud
- The Linux kernel 6.12 and modules for use on cloud platforms including
- Amazon EC2, Microsoft Azure, and Google Compute Engine.
->>>>>>> debian
 
 Package: linux-image-6.12.11-cloud-arm64-dbg
 Architecture: arm64
@@ -1273,24 +1202,7 @@ Description: Debug symbols for linux-image-6.12.11-cloud-arm64
  This package provides the detached debug symbols for the Linux kernel and
  modules in linux-image-6.12.11-cloud-arm64.
 
-<<<<<<< HEAD
-Package: linux-image-6.12.8-loong64
-=======
-Package: linux-image-6.12.11-cloud-arm64-unsigned
-Architecture: arm64
-Build-Profiles: <!pkg.linux.nokernel>
-Depends: kmod, linux-base (>= 4.3~), ${misc:Depends}, initramfs-tools (>= 0.120+deb8u2) [arm64] | linux-initramfs-tool [arm64]
-Recommends: apparmor [arm64]
-Suggests: firmware-linux-free, linux-doc-6.12, debian-kernel-handbook
-Replaces: linux-image-6.12.11-cloud-arm64
-Breaks: fwupdate (<< 12-7) [arm64], wireless-regdb (<< 2019.06.03-1~) [arm64], initramfs-tools (<< 0.120+deb8u2) [arm64]
-Conflicts: linux-image-6.12.11-cloud-arm64
-Description: Linux 6.12 for arm64 cloud
- The Linux kernel 6.12 and modules for use on cloud platforms supporting
- arm64 virtual machines.
-
 Package: linux-image-6.12.11-loong64
->>>>>>> debian
 Architecture: loong64
 Build-Profiles: <!pkg.linux.nokernel>
 Depends: kmod, linux-base (>= 4.3~), ${misc:Depends}, initramfs-tools (>= 0.120+deb8u2) [loong64] | linux-initramfs-tool [loong64]
@@ -1683,8 +1595,7 @@ Description: Debug symbols for linux-image-6.12.11-rpi
  This package provides the detached debug symbols for the Linux kernel and
  modules in linux-image-6.12.11-rpi.
 
-<<<<<<< HEAD
-Package: linux-image-6.12.8-rt-amd64
+Package: linux-image-6.12.11-rt-amd64
 Architecture: amd64
 Build-Profiles: <!pkg.linux.nokernel !pkg.linux.quick>
 Depends: kmod, linux-base (>= 4.3~), ${misc:Depends}, initramfs-tools (>= 0.120+deb8u2) [amd64] | linux-initramfs-tool [amd64]
@@ -1697,10 +1608,7 @@ Description: Linux 6.12 for 64-bit PCs, PREEMPT_RT
  .
  This kernel includes the PREEMPT_RT realtime patch set.
 
-Package: linux-image-6.12.8-rt-amd64-dbg
-=======
 Package: linux-image-6.12.11-rt-amd64-dbg
->>>>>>> debian
 Architecture: amd64
 Section: debug
 Priority: optional
@@ -1710,8 +1618,7 @@ Description: Debug symbols for linux-image-6.12.11-rt-amd64
  This package provides the detached debug symbols for the Linux kernel and
  modules in linux-image-6.12.11-rt-amd64.
 
-<<<<<<< HEAD
-Package: linux-image-6.12.8-rt-arm64
+Package: linux-image-6.12.11-rt-arm64
 Architecture: arm64
 Build-Profiles: <!pkg.linux.nokernel !pkg.linux.quick>
 Depends: kmod, linux-base (>= 4.3~), ${misc:Depends}, initramfs-tools (>= 0.120+deb8u2) [arm64] | linux-initramfs-tool [arm64]
@@ -1720,20 +1627,6 @@ Suggests: firmware-linux-free, linux-doc-6.12, debian-kernel-handbook
 Breaks: fwupdate (<< 12-7) [arm64], wireless-regdb (<< 2019.06.03-1~) [arm64], initramfs-tools (<< 0.120+deb8u2) [arm64]
 Description: Linux 6.12 for 64-bit ARMv8 machines, PREEMPT_RT
  The Linux kernel 6.12 and modules for use on 64-bit ARMv8 machines.
-=======
-Package: linux-image-6.12.11-rt-amd64-unsigned
-Architecture: amd64
-Build-Profiles: <!pkg.linux.nokernel !pkg.linux.quick>
-Depends: kmod, linux-base (>= 4.3~), ${misc:Depends}, initramfs-tools (>= 0.120+deb8u2) [amd64] | linux-initramfs-tool [amd64]
-Recommends: apparmor [amd64]
-Suggests: firmware-linux-free, linux-doc-6.12, debian-kernel-handbook, grub-pc [amd64] | grub-efi-amd64 [amd64] | extlinux [amd64]
-Replaces: linux-image-6.12.11-rt-amd64
-Breaks: fwupdate (<< 12-7) [amd64], wireless-regdb (<< 2019.06.03-1~) [amd64], initramfs-tools (<< 0.120+deb8u2) [amd64]
-Conflicts: linux-image-6.12.11-rt-amd64
-Description: Linux 6.12 for 64-bit PCs, PREEMPT_RT
- The Linux kernel 6.12 and modules for use on PCs with AMD64, Intel 64 or
- VIA Nano processors.
->>>>>>> debian
  .
  This kernel includes the PREEMPT_RT realtime patch set.
 
@@ -1747,25 +1640,7 @@ Description: Debug symbols for linux-image-6.12.11-rt-arm64
  This package provides the detached debug symbols for the Linux kernel and
  modules in linux-image-6.12.11-rt-arm64.
 
-<<<<<<< HEAD
-Package: linux-image-6.12.8-rt-armmp
-=======
-Package: linux-image-6.12.11-rt-arm64-unsigned
-Architecture: arm64
-Build-Profiles: <!pkg.linux.nokernel !pkg.linux.quick>
-Depends: kmod, linux-base (>= 4.3~), ${misc:Depends}, initramfs-tools (>= 0.120+deb8u2) [arm64] | linux-initramfs-tool [arm64]
-Recommends: apparmor [arm64]
-Suggests: firmware-linux-free, linux-doc-6.12, debian-kernel-handbook
-Replaces: linux-image-6.12.11-rt-arm64
-Breaks: fwupdate (<< 12-7) [arm64], wireless-regdb (<< 2019.06.03-1~) [arm64], initramfs-tools (<< 0.120+deb8u2) [arm64]
-Conflicts: linux-image-6.12.11-rt-arm64
-Description: Linux 6.12 for 64-bit ARMv8 machines, PREEMPT_RT
- The Linux kernel 6.12 and modules for use on 64-bit ARMv8 machines.
- .
- This kernel includes the PREEMPT_RT realtime patch set.
-
 Package: linux-image-6.12.11-rt-armmp
->>>>>>> debian
 Architecture: armhf
 Build-Profiles: <!pkg.linux.nokernel !pkg.linux.quick>
 Depends: kmod, linux-base (>= 4.3~), ${misc:Depends}, initramfs-tools (>= 0.120+deb8u2) [armhf] | linux-initramfs-tool [armhf]
@@ -1934,8 +1809,8 @@ Description: Debugging symbols for Linux alpha-smp configuration (meta-package)
 Package: linux-image-amd64
 Architecture: amd64
 Build-Profiles: <!pkg.linux.nokernel !pkg.linux.nometa !pkg.linux.quick>
-Provides: linux-latest-modules-6.12.8-amd64, wireguard-modules (= 1.0.0), virtualbox-guest-modules [amd64], linux-image-generic
-Depends: linux-image-6.12.8-amd64 (= ${binary:Version}), ${misc:Depends}
+Provides: linux-latest-modules-6.12.11-amd64, wireguard-modules (= 1.0.0), virtualbox-guest-modules [amd64], linux-image-generic
+Depends: linux-image-6.12.11-amd64 (= ${binary:Version}), ${misc:Depends}
 Description: Linux for 64-bit PCs (meta-package)
  This package depends on the latest Linux kernel and modules for use on PCs
  with AMD64, Intel 64 or VIA Nano processors.
@@ -1952,8 +1827,8 @@ Description: Debugging symbols for Linux amd64 configuration (meta-package)
 Package: linux-image-arm64
 Architecture: arm64
 Build-Profiles: <!pkg.linux.nokernel !pkg.linux.nometa !pkg.linux.quick>
-Provides: linux-latest-modules-6.12.8-arm64, wireguard-modules (= 1.0.0), virtualbox-guest-modules [amd64], linux-image-generic
-Depends: linux-image-6.12.8-arm64 (= ${binary:Version}), ${misc:Depends}
+Provides: linux-latest-modules-6.12.11-arm64, wireguard-modules (= 1.0.0), virtualbox-guest-modules [amd64], linux-image-generic
+Depends: linux-image-6.12.11-arm64 (= ${binary:Version}), ${misc:Depends}
 Description: Linux for 64-bit ARMv8 machines (meta-package)
  This package depends on the latest Linux kernel and modules for use on
  64-bit ARMv8 machines.
@@ -1961,8 +1836,8 @@ Description: Linux for 64-bit ARMv8 machines (meta-package)
 Package: linux-image-arm64-16k
 Architecture: arm64
 Build-Profiles: <!pkg.linux.nokernel !pkg.linux.nometa !pkg.linux.quick>
-Provides: linux-latest-modules-6.12.8-arm64-16k, wireguard-modules (= 1.0.0), virtualbox-guest-modules [amd64]
-Depends: linux-image-6.12.8-arm64-16k (= ${binary:Version}), ${misc:Depends}
+Provides: linux-latest-modules-6.12.11-arm64-16k, wireguard-modules (= 1.0.0), virtualbox-guest-modules [amd64]
+Depends: linux-image-6.12.11-arm64-16k (= ${binary:Version}), ${misc:Depends}
 Description: Linux for 64-bit ARMv8 machines with 16k pages (meta-package)
  This package depends on the latest Linux kernel and modules for use on
  64-bit ARMv8 machines with 16k pages.
@@ -2028,8 +1903,8 @@ Description: Debugging symbols for Linux armmp-lpae configuration (meta-package)
 Package: linux-image-cloud-amd64
 Architecture: amd64
 Build-Profiles: <!pkg.linux.nokernel !pkg.linux.nometa>
-Provides: linux-latest-modules-6.12.8-cloud-amd64, wireguard-modules (= 1.0.0), virtualbox-guest-modules [amd64]
-Depends: linux-image-6.12.8-cloud-amd64 (= ${binary:Version}), ${misc:Depends}
+Provides: linux-latest-modules-6.12.11-cloud-amd64, wireguard-modules (= 1.0.0), virtualbox-guest-modules [amd64]
+Depends: linux-image-6.12.11-cloud-amd64 (= ${binary:Version}), ${misc:Depends}
 Description: Linux for x86-64 cloud (meta-package)
  This package depends on the latest Linux kernel and modules for use on
  cloud platforms including Amazon EC2, Microsoft Azure, and Google Compute
@@ -2047,8 +1922,8 @@ Description: Debugging symbols for Linux cloud-amd64 configuration (meta-package
 Package: linux-image-cloud-arm64
 Architecture: arm64
 Build-Profiles: <!pkg.linux.nokernel !pkg.linux.nometa>
-Provides: linux-latest-modules-6.12.8-cloud-arm64, wireguard-modules (= 1.0.0), virtualbox-guest-modules [amd64]
-Depends: linux-image-6.12.8-cloud-arm64 (= ${binary:Version}), ${misc:Depends}
+Provides: linux-latest-modules-6.12.11-cloud-arm64, wireguard-modules (= 1.0.0), virtualbox-guest-modules [amd64]
+Depends: linux-image-6.12.11-cloud-arm64 (= ${binary:Version}), ${misc:Depends}
 Description: Linux for arm64 cloud (meta-package)
  This package depends on the latest Linux kernel and modules for use on
  cloud platforms supporting arm64 virtual machines.
@@ -2407,8 +2282,8 @@ Description: Debugging symbols for Linux rpi configuration (meta-package)
 Package: linux-image-rt-amd64
 Architecture: amd64
 Build-Profiles: <!pkg.linux.nokernel !pkg.linux.nometa !pkg.linux.quick>
-Provides: linux-latest-modules-6.12.8-rt-amd64, wireguard-modules (= 1.0.0), virtualbox-guest-modules [amd64]
-Depends: linux-image-6.12.8-rt-amd64 (= ${binary:Version}), ${misc:Depends}
+Provides: linux-latest-modules-6.12.11-rt-amd64, wireguard-modules (= 1.0.0), virtualbox-guest-modules [amd64]
+Depends: linux-image-6.12.11-rt-amd64 (= ${binary:Version}), ${misc:Depends}
 Description: Linux for 64-bit PCs (meta-package)
  This package depends on the latest Linux kernel and modules for use on PCs
  with AMD64, Intel 64 or VIA Nano processors.
@@ -2425,8 +2300,8 @@ Description: Debugging symbols for Linux rt-amd64 configuration (meta-package)
 Package: linux-image-rt-arm64
 Architecture: arm64
 Build-Profiles: <!pkg.linux.nokernel !pkg.linux.nometa !pkg.linux.quick>
-Provides: linux-latest-modules-6.12.8-rt-arm64, wireguard-modules (= 1.0.0), virtualbox-guest-modules [amd64]
-Depends: linux-image-6.12.8-rt-arm64 (= ${binary:Version}), ${misc:Depends}
+Provides: linux-latest-modules-6.12.11-rt-arm64, wireguard-modules (= 1.0.0), virtualbox-guest-modules [amd64]
+Depends: linux-image-6.12.11-rt-arm64 (= ${binary:Version}), ${misc:Depends}
 Description: Linux for 64-bit ARMv8 machines (meta-package)
  This package depends on the latest Linux kernel and modules for use on
  64-bit ARMv8 machines.

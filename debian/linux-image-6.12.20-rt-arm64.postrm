@@ -1,6 +1,6 @@
 #!/bin/sh -e
 
-version=6.12.13-cloud-arm64
+version=6.12.20-rt-arm64
 image_path=/boot/vmlinuz-$version
 
 rm -f /lib/modules/$version/.fresh-install

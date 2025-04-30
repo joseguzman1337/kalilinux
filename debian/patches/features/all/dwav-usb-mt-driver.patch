@@ -16,7 +16,7 @@ Change-Id: Ia1c8c29d3f69c6ba5d630279c4cc98119b68ab71
 
 --- a/drivers/hid/hid-ids.h
 +++ b/drivers/hid/hid-ids.h
-@@ -1461,4 +1461,10 @@
+@@ -1514,4 +1514,10 @@
  #define USB_VENDOR_ID_SIGNOTEC			0x2133
  #define USB_DEVICE_ID_SIGNOTEC_VIEWSONIC_PD1011	0x0018
  
@@ -29,10 +29,10 @@ Change-Id: Ia1c8c29d3f69c6ba5d630279c4cc98119b68ab71
  #endif
 --- a/drivers/hid/hid-quirks.c
 +++ b/drivers/hid/hid-quirks.c
-@@ -891,6 +891,10 @@ static const struct hid_device_id hid_ig
- 	{ HID_USB_DEVICE(USB_VENDOR_ID_SYNAPTICS, USB_DEVICE_ID_SYNAPTICS_DPAD) },
+@@ -892,6 +892,10 @@ static const struct hid_device_id hid_ig
  #endif
  	{ HID_USB_DEVICE(USB_VENDOR_ID_YEALINK, USB_DEVICE_ID_YEALINK_P1K_P4K_B2K) },
+ 	{ HID_USB_DEVICE(USB_VENDOR_ID_QUANTA, USB_DEVICE_ID_QUANTA_HP_5MP_CAMERA_5473) },
 +
 +	{ HID_USB_DEVICE(USB_VENDOR_ID_DWAV, USB_DEVICE_ID_DWAV_MULTITOUCH) },
 +	{ HID_USB_DEVICE(USB_VENDOR_ID_ODROID, USB_DEVICE_ID_VU5) },
@@ -42,7 +42,7 @@ Change-Id: Ia1c8c29d3f69c6ba5d630279c4cc98119b68ab71
  
 --- a/drivers/input/touchscreen/Kconfig
 +++ b/drivers/input/touchscreen/Kconfig
-@@ -1399,4 +1399,14 @@ config TOUCHSCREEN_HIMAX_HX83112B
+@@ -1388,4 +1388,14 @@ config TOUCHSCREEN_HIMAX_HX83112B
  	  To compile this driver as a module, choose M here: the
  	  module will be called himax_hx83112b.
  
@@ -59,7 +59,7 @@ Change-Id: Ia1c8c29d3f69c6ba5d630279c4cc98119b68ab71
  endif
 --- a/drivers/input/touchscreen/Makefile
 +++ b/drivers/input/touchscreen/Makefile
-@@ -118,3 +118,4 @@ obj-$(CONFIG_TOUCHSCREEN_IQS5XX)	+= iqs5
+@@ -117,3 +117,4 @@ obj-$(CONFIG_TOUCHSCREEN_IQS5XX)	+= iqs5
  obj-$(CONFIG_TOUCHSCREEN_IQS7211)	+= iqs7211.o
  obj-$(CONFIG_TOUCHSCREEN_ZINITIX)	+= zinitix.o
  obj-$(CONFIG_TOUCHSCREEN_HIMAX_HX83112B)	+= himax_hx83112b.o

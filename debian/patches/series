@@ -38,8 +38,6 @@ bugfix/all/radeon-amdgpu-firmware-is-required-for-drm-and-kms-on-r600-onward.pat
 features/all/kali-wifi-injection.patch
 features/all/wireless-carl9170-Enable-sniffer-mode-promisc-flag-t.patch
 features/all/dwav-usb-mt-driver.patch
-bugfix/all/ath11k-fix-rx-completion.patch
-bugfix/all/fix-ring-buffer-corruption.patch
 
 # Change some defaults for security reasons
 debian/af_802154-Disable-auto-loading-as-mitigation-against.patch

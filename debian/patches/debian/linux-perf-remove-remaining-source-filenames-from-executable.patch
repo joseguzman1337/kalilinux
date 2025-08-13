@@ -15,7 +15,7 @@ to the installed location.
 ---
 --- a/tools/perf/builtin-report.c
 +++ b/tools/perf/builtin-report.c
-@@ -654,10 +654,12 @@ static int report__browse_hists(struct r
+@@ -662,10 +662,12 @@ static int report__browse_hists(struct r
  
  	path = system_path(TIPDIR);
  	if (perf_tip(&help, path) || help == NULL) {
@@ -41,7 +41,7 @@ to the installed location.
  perf-test-y += workloads/
 --- a/tools/perf/Build
 +++ b/tools/perf/Build
-@@ -51,7 +51,7 @@ CFLAGS_perf.o              += -DPERF_HTM
+@@ -52,7 +52,7 @@ CFLAGS_perf.o              += -DPERF_HTM
  			      -DPREFIX="BUILD_STR($(prefix_SQ))"
  CFLAGS_builtin-trace.o	   += -DSTRACE_GROUPS_DIR="BUILD_STR($(STRACE_GROUPS_DIR_SQ))"
  CFLAGS_builtin-report.o	   += -DTIPDIR="BUILD_STR($(tipdir_SQ))"

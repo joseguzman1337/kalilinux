@@ -22,7 +22,7 @@ Export the currently un-exported symbols it depends on.
 
 --- a/fs/file.c
 +++ b/fs/file.c
-@@ -823,6 +823,7 @@ struct file *file_close_fd(unsigned int
+@@ -801,6 +801,7 @@ struct file *file_close_fd(unsigned int
  
  	return file;
  }
@@ -42,7 +42,7 @@ Export the currently un-exported symbols it depends on.
  	struct msg_msgseg *next;
 --- a/ipc/namespace.c
 +++ b/ipc/namespace.c
-@@ -205,6 +205,7 @@ void put_ipc_ns(struct ipc_namespace *ns
+@@ -207,6 +207,7 @@ void put_ipc_ns(struct ipc_namespace *ns
  			schedule_work(&free_ipc_work);
  	}
  }
@@ -72,7 +72,7 @@ Export the currently un-exported symbols it depends on.
   * Note: we use "set_current_state()" _after_ the wait-queue add,
 --- a/kernel/task_work.c
 +++ b/kernel/task_work.c
-@@ -97,6 +97,7 @@ int task_work_add(struct task_struct *ta
+@@ -108,6 +108,7 @@ int task_work_add(struct task_struct *ta
  
  	return 0;
  }
@@ -92,7 +92,7 @@ Export the currently un-exported symbols it depends on.
   * zap_vma_ptes - remove ptes mapping the vma
 --- a/security/security.c
 +++ b/security/security.c
-@@ -890,6 +890,7 @@ int security_binder_set_context_mgr(cons
+@@ -997,6 +997,7 @@ int security_binder_set_context_mgr(cons
  {
  	return call_int_hook(binder_set_context_mgr, mgr);
  }
@@ -100,7 +100,7 @@ Export the currently un-exported symbols it depends on.
  
  /**
   * security_binder_transaction() - Check if a binder transaction is allowed
-@@ -905,6 +906,7 @@ int security_binder_transaction(const st
+@@ -1012,6 +1013,7 @@ int security_binder_transaction(const st
  {
  	return call_int_hook(binder_transaction, from, to);
  }
@@ -108,7 +108,7 @@ Export the currently un-exported symbols it depends on.
  
  /**
   * security_binder_transfer_binder() - Check if a binder transfer is allowed
-@@ -920,6 +922,7 @@ int security_binder_transfer_binder(cons
+@@ -1027,6 +1029,7 @@ int security_binder_transfer_binder(cons
  {
  	return call_int_hook(binder_transfer_binder, from, to);
  }
@@ -116,7 +116,7 @@ Export the currently un-exported symbols it depends on.
  
  /**
   * security_binder_transfer_file() - Check if a binder file xfer is allowed
-@@ -936,6 +939,7 @@ int security_binder_transfer_file(const
+@@ -1043,6 +1046,7 @@ int security_binder_transfer_file(const
  {
  	return call_int_hook(binder_transfer_file, from, to, file);
  }

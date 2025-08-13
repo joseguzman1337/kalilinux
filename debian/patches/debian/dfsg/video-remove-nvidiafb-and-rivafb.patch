@@ -15,7 +15,7 @@ probably discontinued 10 years ago.
 ---
 --- a/drivers/video/fbdev/Kconfig
 +++ b/drivers/video/fbdev/Kconfig
-@@ -654,100 +654,6 @@ config FB_ATMEL
+@@ -657,100 +657,6 @@ config FB_ATMEL
  	help
  	  This enables support for the AT91 LCD Controller.
  

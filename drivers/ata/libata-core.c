@@ -2274,7 +2274,7 @@ static void ata_dev_config_ncq_non_data(struct ata_device *dev)
 
 	if (!ata_log_supported(dev, ATA_LOG_NCQ_NON_DATA)) {
 		ata_dev_warn(dev,
-			     "NCQ Send/Recv Log not supported\n");
+			     "NCQ Non-Data Log not supported\n");
 		return;
 	}
 	err_mask = ata_read_log_page(dev, ATA_LOG_NCQ_NON_DATA,
@@ -4583,7 +4583,7 @@ int atapi_check_dma(struct ata_queued_cmd *qc)
 	 */
 	if (!(qc->dev->quirks & ATA_QUIRK_ATAPI_MOD16_DMA) &&
 	    unlikely(qc->nbytes & 15))
-		return 1;
+		return -EOPNOTSUPP;
 
 	if (ap->ops->check_atapi_dma)
 		return ap->ops->check_atapi_dma(qc);
@@ -6681,12 +6681,6 @@ const struct ata_port_info ata_dummy_port_info = {
 	.port_ops		= &ata_dummy_port_ops,
 };
 EXPORT_SYMBOL_GPL(ata_dummy_port_info);
-
-void ata_print_version(const struct device *dev, const char *version)
-{
-	dev_printk(KERN_DEBUG, dev, "version %s\n", version);
-}
-EXPORT_SYMBOL(ata_print_version);
 
 EXPORT_TRACEPOINT_SYMBOL_GPL(ata_tf_load);
 EXPORT_TRACEPOINT_SYMBOL_GPL(ata_exec_command);

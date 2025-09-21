@@ -860,7 +860,7 @@ int usbnet_stop (struct net_device *net)
 
 	/* deferred work (timer, softirq, task) must also stop */
 	dev->flags = 0;
-	del_timer_sync(&dev->delay);
+	timer_delete_sync(&dev->delay);
 	tasklet_kill(&dev->bh);
 	cancel_work_sync(&dev->kevent);
 
@@ -869,7 +869,7 @@ int usbnet_stop (struct net_device *net)
 	 * we have a flag
 	 */
 	tasklet_kill(&dev->bh);
-	del_timer_sync(&dev->delay);
+	timer_delete_sync(&dev->delay);
 	cancel_work_sync(&dev->kevent);
 
 	if (!pm)
@@ -1112,6 +1112,9 @@ static void __handle_link_change(struct usbnet *dev)
 {
 	if (!test_bit(EVENT_DEV_OPEN, &dev->flags))
 		return;
+
+	if (test_and_clear_bit(EVENT_LINK_CARRIER_ON, &dev->flags))
+		netif_carrier_on(dev->net);
 
 	if (!netif_carrier_ok(dev->net)) {
 		/* kill URBs for reading packets to save bus bandwidth */
@@ -1551,7 +1554,7 @@ static inline void usb_free_skb(struct sk_buff *skb)
 
 static void usbnet_bh (struct timer_list *t)
 {
-	struct usbnet		*dev = from_timer(dev, t, delay);
+	struct usbnet		*dev = timer_container_of(dev, t, delay);
 	struct sk_buff		*skb;
 	struct skb_data		*entry;
 
@@ -1882,7 +1885,7 @@ out1:
 	 */
 	usbnet_mark_going_away(dev);
 	cancel_work_sync(&dev->kevent);
-	del_timer_sync(&dev->delay);
+	timer_delete_sync(&dev->delay);
 	free_netdev(net);
 out:
 	return status;
@@ -2009,10 +2012,12 @@ EXPORT_SYMBOL(usbnet_manage_power);
 void usbnet_link_change(struct usbnet *dev, bool link, bool need_reset)
 {
 	/* update link after link is reseted */
-	if (link && !need_reset)
-		netif_carrier_on(dev->net);
-	else
+	if (link && !need_reset) {
+		set_bit(EVENT_LINK_CARRIER_ON, &dev->flags);
+	} else {
+		clear_bit(EVENT_LINK_CARRIER_ON, &dev->flags);
 		netif_carrier_off(dev->net);
+	}
 
 	if (need_reset && link)
 		usbnet_defer_kevent(dev, EVENT_LINK_RESET);

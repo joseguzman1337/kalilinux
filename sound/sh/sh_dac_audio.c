@@ -312,8 +312,7 @@ static int snd_sh_dac_create(struct snd_card *card,
 
 	chip->card = card;
 
-	hrtimer_init(&chip->hrtimer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	chip->hrtimer.function = sh_dac_audio_timer;
+	hrtimer_setup(&chip->hrtimer, sh_dac_audio_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 
 	dac_audio_reset(chip);
 	chip->rate = 8000;
@@ -382,7 +381,7 @@ probe_error:
  */
 static struct platform_driver sh_dac_driver = {
 	.probe	= snd_sh_dac_probe,
-	.remove_new = snd_sh_dac_remove,
+	.remove = snd_sh_dac_remove,
 	.driver = {
 		.name = "dac_audio",
 	},

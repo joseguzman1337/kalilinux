@@ -93,8 +93,6 @@ CONFIG_IO_DELAY_0X80=y
 ##
 CONFIG_CRYPTO_AES_NI_INTEL=m
 CONFIG_CRYPTO_GHASH_CLMUL_NI_INTEL=m
-CONFIG_CRYPTO_CRC32C_INTEL=m
-CONFIG_CRYPTO_CRC32_PCLMUL=m
 
 ##
 ## file: arch/x86/events/Kconfig
@@ -521,8 +519,6 @@ CONFIG_EDAC_I7300=m
 CONFIG_EDAC_SKX=m
 CONFIG_EDAC_I10NM=m
 CONFIG_EDAC_PND2=m
-CONFIG_EDAC_AMD8131=m
-CONFIG_EDAC_AMD8111=m
 
 ##
 ## file: drivers/extcon/Kconfig
@@ -579,16 +575,6 @@ CONFIG_DRM_HYPERV=m
 CONFIG_DRM_AMD_ACP=y
 
 ##
-## file: drivers/gpu/drm/amd/amdgpu/Kconfig
-##
-CONFIG_DRM_AMDGPU=m
-
-##
-## file: drivers/gpu/drm/amd/amdkfd/Kconfig
-##
-CONFIG_HSA_AMD=y
-
-##
 ## file: drivers/gpu/drm/ast/Kconfig
 ##
 CONFIG_DRM_AST=m
@@ -602,12 +588,6 @@ CONFIG_DRM_DISPLAY_DP_AUX_CEC=y
 ## file: drivers/gpu/drm/gma500/Kconfig
 ##
 CONFIG_DRM_GMA500=m
-
-##
-## file: drivers/gpu/drm/i2c/Kconfig
-##
-CONFIG_DRM_I2C_CH7006=m
-CONFIG_DRM_I2C_SIL164=m
 
 ##
 ## file: drivers/gpu/drm/i915/Kconfig
@@ -624,6 +604,8 @@ CONFIG_DRM_MGAG200=m
 ##
 CONFIG_DRM_NOUVEAU=m
 CONFIG_DRM_NOUVEAU_BACKLIGHT=y
+CONFIG_DRM_NOUVEAU_CH7006=m
+CONFIG_DRM_NOUVEAU_SIL164=m
 
 ##
 ## file: drivers/gpu/drm/radeon/Kconfig
@@ -759,7 +741,6 @@ CONFIG_I2C_ALI1535=m
 CONFIG_I2C_ALI1563=m
 CONFIG_I2C_ALI15X3=m
 CONFIG_I2C_AMD756=m
-CONFIG_I2C_AMD756_S4882=m
 CONFIG_I2C_AMD8111=m
 CONFIG_I2C_AMD_MP2=m
 CONFIG_I2C_I801=m
@@ -920,7 +901,7 @@ CONFIG_LEDS_CLEVO_MAIL=m
 CONFIG_LEDS_MENF21BMC=m
 
 ##
-## file: drivers/leds/simple/Kconfig
+## file: drivers/leds/simatic/Kconfig
 ##
 CONFIG_LEDS_SIEMENS_SIMATIC_IPC=m
 
@@ -945,6 +926,7 @@ CONFIG_DVB_RTL2832_SDR=m
 ##
 CONFIG_VIDEO_HI556=m
 CONFIG_VIDEO_OV01A10=m
+CONFIG_VIDEO_OV02C10=m
 CONFIG_VIDEO_OV08X40=m
 CONFIG_VIDEO_OV13B10=m
 CONFIG_VIDEO_OV2680=m
@@ -1173,7 +1155,6 @@ CONFIG_MTD_REDBOOT_DIRECTORY_BLOCK=-1
 ##
 CONFIG_DUMMY=m
 CONFIG_NET_FC=y
-CONFIG_NET_SB1000=m
 CONFIG_VMXNET3=m
 
 ##
@@ -1253,8 +1234,6 @@ CONFIG_PCMCIA_XIRCOM=m
 ## file: drivers/net/ethernet/dlink/Kconfig
 ##
 CONFIG_NET_VENDOR_DLINK=y
-CONFIG_SUNDANCE=m
-# CONFIG_SUNDANCE_MMIO is not set
 
 ##
 ## file: drivers/net/ethernet/fujitsu/Kconfig
@@ -1757,29 +1736,6 @@ CONFIG_STAGING_MEDIA=y
 CONFIG_VIDEO_IPU3_IMGU=m
 
 ##
-## file: drivers/staging/rtl8192e/Kconfig
-##
-CONFIG_RTLLIB=m
-CONFIG_RTLLIB_CRYPTO_CCMP=m
-CONFIG_RTLLIB_CRYPTO_TKIP=m
-CONFIG_RTLLIB_CRYPTO_WEP=m
-
-##
-## file: drivers/staging/rtl8192e/rtl8192e/Kconfig
-##
-CONFIG_RTL8192E=m
-
-##
-## file: drivers/staging/rts5208/Kconfig
-##
-CONFIG_RTS5208=m
-
-##
-## file: drivers/staging/vt6656/Kconfig
-##
-CONFIG_VT6656=m
-
-##
 ## file: drivers/thermal/Kconfig
 ##
 CONFIG_THERMAL=y
@@ -2010,7 +1966,6 @@ CONFIG_KEMPLD_WDT=m
 CONFIG_SC1200_WDT=m
 CONFIG_NV_TCO=m
 CONFIG_60XX_WDT=m
-CONFIG_CPU5_WDT=m
 CONFIG_VIA_WDT=m
 CONFIG_W83627HF_WDT=m
 CONFIG_W83877F_WDT=m
@@ -2043,10 +1998,9 @@ CONFIG_VBOXSF_FS=m
 ##
 ## file: init/Kconfig
 ##
-CONFIG_USELIB=y
 # CONFIG_IRQ_TIME_ACCOUNTING is not set
-CONFIG_SGETMASK_SYSCALL=y
 CONFIG_SYSFS_SYSCALL=y
+CONFIG_SGETMASK_SYSCALL=y
 
 ##
 ## file: kernel/Kconfig.kexec

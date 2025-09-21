@@ -177,16 +177,12 @@ CONFIG_CPU_FREQ_PMAC=y
 CONFIG_DRM=m
 
 ##
-## file: drivers/gpu/drm/i2c/Kconfig
-##
-CONFIG_DRM_I2C_CH7006=m
-CONFIG_DRM_I2C_SIL164=m
-
-##
 ## file: drivers/gpu/drm/nouveau/Kconfig
 ##
 CONFIG_DRM_NOUVEAU=m
 CONFIG_DRM_NOUVEAU_BACKLIGHT=y
+CONFIG_DRM_NOUVEAU_CH7006=m
+CONFIG_DRM_NOUVEAU_SIL164=m
 
 ##
 ## file: drivers/gpu/drm/radeon/Kconfig
@@ -449,12 +445,6 @@ CONFIG_TULIP=m
 CONFIG_WINBOND_840=m
 CONFIG_DM9102=m
 CONFIG_PCMCIA_XIRCOM=m
-
-##
-## file: drivers/net/ethernet/dlink/Kconfig
-##
-CONFIG_SUNDANCE=m
-CONFIG_SUNDANCE_MMIO=y
 
 ##
 ## file: drivers/net/ethernet/fujitsu/Kconfig

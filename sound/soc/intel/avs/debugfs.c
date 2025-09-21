@@ -10,6 +10,7 @@
 #include <linux/kfifo.h>
 #include <linux/wait.h>
 #include <linux/sched/signal.h>
+#include <linux/string_helpers.h>
 #include <sound/soc.h>
 #include "avs.h"
 #include "messages.h"
@@ -143,7 +144,7 @@ static ssize_t probe_points_write(struct file *file, const char __user *from, si
 	int ret;
 
 	ret = parse_int_array_user(from, count, (int **)&array);
-	if (ret < 0)
+	if (ret)
 		return ret;
 
 	num_elems = *array;
@@ -180,7 +181,7 @@ static ssize_t probe_points_disconnect_write(struct file *file, const char __use
 	int ret;
 
 	ret = parse_int_array_user(from, count, (int **)&array);
-	if (ret < 0)
+	if (ret)
 		return ret;
 
 	num_elems = *array;
@@ -368,7 +369,7 @@ static ssize_t trace_control_write(struct file *file, const char __user *from, s
 	int ret;
 
 	ret = parse_int_array_user(from, count, (int **)&array);
-	if (ret < 0)
+	if (ret)
 		return ret;
 
 	num_elems = *array;

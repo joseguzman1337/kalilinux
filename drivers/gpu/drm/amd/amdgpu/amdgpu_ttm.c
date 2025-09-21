@@ -61,7 +61,7 @@
 #include "amdgpu_res_cursor.h"
 #include "bif/bif_4_1_d.h"
 
-MODULE_IMPORT_NS(DMA_BUF);
+MODULE_IMPORT_NS("DMA_BUF");
 
 #define AMDGPU_TTM_VRAM_MAX_DW_READ	((size_t)128)
 
@@ -1766,7 +1766,8 @@ static int amdgpu_ttm_reserve_tmr(struct amdgpu_device *adev)
 
 	if (!adev->bios &&
 	    (amdgpu_ip_version(adev, GC_HWIP, 0) == IP_VERSION(9, 4, 3) ||
-	     amdgpu_ip_version(adev, GC_HWIP, 0) == IP_VERSION(9, 4, 4)))
+	     amdgpu_ip_version(adev, GC_HWIP, 0) == IP_VERSION(9, 4, 4) ||
+	     amdgpu_ip_version(adev, GC_HWIP, 0) == IP_VERSION(9, 5, 0)))
 		reserve_size = max(reserve_size, (uint32_t)280 << 20);
 	else if (!reserve_size)
 		reserve_size = DISCOVERY_TMR_OFFSET;
@@ -1963,10 +1964,19 @@ int amdgpu_ttm_init(struct amdgpu_device *adev)
 	/* Compute GTT size, either based on TTM limit
 	 * or whatever the user passed on module init.
 	 */
-	if (amdgpu_gtt_size == -1)
-		gtt_size = ttm_tt_pages_limit() << PAGE_SHIFT;
-	else
-		gtt_size = (uint64_t)amdgpu_gtt_size << 20;
+	gtt_size = ttm_tt_pages_limit() << PAGE_SHIFT;
+	if (amdgpu_gtt_size != -1) {
+		uint64_t configured_size = (uint64_t)amdgpu_gtt_size << 20;
+
+		drm_warn(&adev->ddev,
+			"Configuring gttsize via module parameter is deprecated, please use ttm.pages_limit\n");
+		if (gtt_size != configured_size)
+			drm_warn(&adev->ddev,
+				"GTT size has been set as %llu but TTM size has been set as %llu, this is unusual\n",
+				configured_size, gtt_size);
+
+		gtt_size = configured_size;
+	}
 
 	/* Initialize GTT memory pool */
 	r = amdgpu_gtt_mgr_init(adev, gtt_size);
@@ -1976,6 +1986,11 @@ int amdgpu_ttm_init(struct amdgpu_device *adev)
 	}
 	DRM_INFO("amdgpu: %uM of GTT memory ready.\n",
 		 (unsigned int)(gtt_size / (1024 * 1024)));
+
+	if (adev->flags & AMD_IS_APU) {
+		if (adev->gmc.real_vram_size < gtt_size)
+			adev->apu_prefer_gtt = true;
+	}
 
 	/* Initialize doorbell pool on PCI BAR */
 	r = amdgpu_ttm_init_on_chip(adev, AMDGPU_PL_DOORBELL, adev->doorbell.size / PAGE_SIZE);
@@ -2066,6 +2081,8 @@ void amdgpu_ttm_fini(struct amdgpu_device *adev)
 	amdgpu_vram_mgr_fini(adev);
 	amdgpu_gtt_mgr_fini(adev);
 	amdgpu_preempt_mgr_fini(adev);
+	amdgpu_doorbell_fini(adev);
+
 	ttm_range_man_fini(&adev->mman.bdev, AMDGPU_PL_GDS);
 	ttm_range_man_fini(&adev->mman.bdev, AMDGPU_PL_GWS);
 	ttm_range_man_fini(&adev->mman.bdev, AMDGPU_PL_OA);

@@ -157,9 +157,7 @@ static void ser_state_run(struct rtw89_ser *ser, u8 evt)
 		    ser_st_name(ser), ser_ev_name(ser, evt));
 
 	wiphy_lock(rtwdev->hw->wiphy);
-	mutex_lock(&rtwdev->mutex);
 	rtw89_leave_lps(rtwdev);
-	mutex_unlock(&rtwdev->mutex);
 	wiphy_unlock(rtwdev->hw->wiphy);
 
 	ser->st_tbl[ser->state].st_func(ser, evt);
@@ -311,6 +309,9 @@ static void ser_reset_vif(struct rtw89_dev *rtwdev, struct rtw89_vif *rtwvif)
 		rtw89_core_release_bit_map(rtwdev->hw_port, rtwvif_link->port);
 		rtwvif_link->net_type = RTW89_NET_TYPE_NO_LINK;
 		rtwvif_link->trigger = false;
+		rtwvif_link->rand_tsf_done = false;
+
+		rtw89_p2p_noa_once_deinit(rtwvif_link);
 	}
 }
 
@@ -367,6 +368,7 @@ static void ser_reset_mac_binding(struct rtw89_dev *rtwdev)
 		ser_reset_vif(rtwdev, rtwvif);
 
 	rtwdev->total_sta_assoc = 0;
+	refcount_set(&rtwdev->refcount_ap_info, 0);
 }
 
 /* hal function */
@@ -484,10 +486,13 @@ static void ser_l1_reset_pre_st_hdl(struct rtw89_ser *ser, u8 evt)
 static void ser_reset_trx_st_hdl(struct rtw89_ser *ser, u8 evt)
 {
 	struct rtw89_dev *rtwdev = container_of(ser, struct rtw89_dev, ser);
+	struct wiphy *wiphy = rtwdev->hw->wiphy;
 
 	switch (evt) {
 	case SER_EV_STATE_IN:
-		cancel_delayed_work_sync(&rtwdev->track_work);
+		wiphy_lock(wiphy);
+		wiphy_delayed_work_cancel(wiphy, &rtwdev->track_work);
+		wiphy_unlock(wiphy);
 		drv_stop_tx(ser);
 
 		if (hal_stop_dma(ser)) {
@@ -518,8 +523,8 @@ static void ser_reset_trx_st_hdl(struct rtw89_ser *ser, u8 evt)
 		hal_enable_dma(ser);
 		drv_resume_rx(ser);
 		drv_resume_tx(ser);
-		ieee80211_queue_delayed_work(rtwdev->hw, &rtwdev->track_work,
-					     RTW89_TRACK_WORK_PERIOD);
+		wiphy_delayed_work_queue(wiphy, &rtwdev->track_work,
+					 RTW89_TRACK_WORK_PERIOD);
 		break;
 
 	default:
@@ -710,9 +715,7 @@ static void ser_l2_reset_st_hdl(struct rtw89_ser *ser, u8 evt)
 	switch (evt) {
 	case SER_EV_STATE_IN:
 		wiphy_lock(rtwdev->hw->wiphy);
-		mutex_lock(&rtwdev->mutex);
 		ser_l2_reset_st_pre_hdl(ser);
-		mutex_unlock(&rtwdev->mutex);
 		wiphy_unlock(rtwdev->hw->wiphy);
 
 		ieee80211_restart_hw(rtwdev->hw);

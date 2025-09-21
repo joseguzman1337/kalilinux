@@ -21,7 +21,6 @@
 
 #define DRIVER_NAME "intel_vpu"
 #define DRIVER_DESC "Driver for Intel NPU (Neural Processing Unit)"
-#define DRIVER_DATE "20230117"
 
 #define PCI_DEVICE_ID_MTL	0x7d1d
 #define PCI_DEVICE_ID_ARL	0xad1d
@@ -59,6 +58,7 @@
 #define IVPU_PLATFORM_SILICON 0
 #define IVPU_PLATFORM_SIMICS  2
 #define IVPU_PLATFORM_FPGA    3
+#define IVPU_PLATFORM_HSLE    4
 #define IVPU_PLATFORM_INVALID 8
 
 #define IVPU_SCHED_MODE_AUTO -1
@@ -111,6 +111,7 @@ struct ivpu_wa_table {
 	bool disable_clock_relinquish;
 	bool disable_d0i3_msg;
 	bool wp0_during_power_up;
+	bool disable_d0i2;
 };
 
 struct ivpu_hw_info;
@@ -138,11 +139,14 @@ struct ivpu_device {
 	struct mutex context_list_lock; /* Protects user context addition/removal */
 	struct xarray context_xa;
 	struct xa_limit context_xa_limit;
-	struct work_struct context_abort_work;
 
 	struct xarray db_xa;
 	struct xa_limit db_limit;
 	u32 db_next;
+
+	struct work_struct irq_ipc_work;
+	struct work_struct irq_dct_work;
+	struct work_struct context_abort_work;
 
 	struct mutex bo_list_lock; /* Protects bo_list */
 	struct list_head bo_list;
@@ -150,6 +154,7 @@ struct ivpu_device {
 	struct mutex submitted_jobs_lock; /* Protects submitted_jobs */
 	struct xarray submitted_jobs_xa;
 	struct ivpu_ipc_consumer job_done_consumer;
+	atomic_t job_timeout_counter;
 
 	atomic64_t unique_id_counter;
 
@@ -200,9 +205,12 @@ extern bool ivpu_force_snoop;
 #define IVPU_TEST_MODE_NULL_SUBMISSION    BIT(2)
 #define IVPU_TEST_MODE_D0I3_MSG_DISABLE   BIT(4)
 #define IVPU_TEST_MODE_D0I3_MSG_ENABLE    BIT(5)
-#define IVPU_TEST_MODE_PREEMPTION_DISABLE BIT(6)
-#define IVPU_TEST_MODE_HWS_EXTRA_EVENTS	  BIT(7)
+#define IVPU_TEST_MODE_MIP_DISABLE        BIT(6)
 #define IVPU_TEST_MODE_DISABLE_TIMEOUTS   BIT(8)
+#define IVPU_TEST_MODE_TURBO		  BIT(9)
+#define IVPU_TEST_MODE_CLK_RELINQ_DISABLE BIT(10)
+#define IVPU_TEST_MODE_CLK_RELINQ_ENABLE  BIT(11)
+#define IVPU_TEST_MODE_D0I2_DISABLE       BIT(12)
 extern int ivpu_test_mode;
 
 struct ivpu_file_priv *ivpu_file_priv_get(struct ivpu_file_priv *file_priv);
@@ -211,6 +219,7 @@ void ivpu_file_priv_put(struct ivpu_file_priv **link);
 int ivpu_boot(struct ivpu_device *vdev);
 int ivpu_shutdown(struct ivpu_device *vdev);
 void ivpu_prepare_for_reset(struct ivpu_device *vdev);
+bool ivpu_is_capable(struct ivpu_device *vdev, u32 capability);
 
 static inline u8 ivpu_revision(struct ivpu_device *vdev)
 {
@@ -285,7 +294,8 @@ static inline bool ivpu_is_simics(struct ivpu_device *vdev)
 
 static inline bool ivpu_is_fpga(struct ivpu_device *vdev)
 {
-	return ivpu_get_platform(vdev) == IVPU_PLATFORM_FPGA;
+	return ivpu_get_platform(vdev) == IVPU_PLATFORM_FPGA ||
+	       ivpu_get_platform(vdev) == IVPU_PLATFORM_HSLE;
 }
 
 static inline bool ivpu_is_force_snoop_enabled(struct ivpu_device *vdev)

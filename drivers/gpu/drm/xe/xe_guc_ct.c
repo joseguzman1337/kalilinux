@@ -8,6 +8,7 @@
 #include <linux/bitfield.h>
 #include <linux/circ_buf.h>
 #include <linux/delay.h>
+#include <linux/fault-inject.h>
 
 #include <kunit/static_stub.h>
 
@@ -17,6 +18,7 @@
 #include "abi/guc_actions_sriov_abi.h"
 #include "abi/guc_klvs_abi.h"
 #include "xe_bo.h"
+#include "xe_devcoredump.h"
 #include "xe_device.h"
 #include "xe_gt.h"
 #include "xe_gt_pagefault.h"
@@ -57,6 +59,7 @@ enum {
 	CT_DEAD_PARSE_G2H_UNKNOWN,		/* 0x1000 */
 	CT_DEAD_PARSE_G2H_ORIGIN,		/* 0x2000 */
 	CT_DEAD_PARSE_G2H_TYPE,			/* 0x4000 */
+	CT_DEAD_CRASH,				/* 0x8000 */
 };
 
 static void ct_dead_worker_func(struct work_struct *w);
@@ -213,7 +216,7 @@ int xe_guc_ct_init(struct xe_guc_ct *ct)
 
 	xe_gt_assert(gt, !(guc_ct_size() % PAGE_SIZE));
 
-	ct->g2h_wq = alloc_ordered_workqueue("xe-g2h-wq", 0);
+	ct->g2h_wq = alloc_ordered_workqueue("xe-g2h-wq", WQ_MEM_RECLAIM);
 	if (!ct->g2h_wq)
 		return -ENOMEM;
 
@@ -237,7 +240,8 @@ int xe_guc_ct_init(struct xe_guc_ct *ct)
 	bo = xe_managed_bo_create_pin_map(xe, tile, guc_ct_size(),
 					  XE_BO_FLAG_SYSTEM |
 					  XE_BO_FLAG_GGTT |
-					  XE_BO_FLAG_GGTT_INVALIDATE);
+					  XE_BO_FLAG_GGTT_INVALIDATE |
+					  XE_BO_FLAG_PINNED_NORESTORE);
 	if (IS_ERR(bo))
 		return PTR_ERR(bo);
 
@@ -251,6 +255,7 @@ int xe_guc_ct_init(struct xe_guc_ct *ct)
 	ct->state = XE_GUC_CT_STATE_DISABLED;
 	return 0;
 }
+ALLOW_ERROR_INJECTION(xe_guc_ct_init, ERRNO); /* See xe_pci_probe() */
 
 #define desc_read(xe_, guc_ctb__, field_)			\
 	xe_map_rd_field(xe_, &guc_ctb__->desc, 0,		\
@@ -437,6 +442,7 @@ int xe_guc_ct_enable(struct xe_guc_ct *ct)
 
 	xe_gt_assert(gt, !xe_guc_ct_enabled(ct));
 
+	xe_map_memset(xe, &ct->bo->vmap, 0, 0, ct->bo->size);
 	guc_ct_ctb_h2g_init(xe, &ct->ctbs.h2g, &ct->bo->vmap);
 	guc_ct_ctb_g2h_init(xe, &ct->ctbs.g2h, &ct->bo->vmap);
 
@@ -467,8 +473,10 @@ int xe_guc_ct_enable(struct xe_guc_ct *ct)
 	 * after any existing dead state has been dumped.
 	 */
 	spin_lock_irq(&ct->dead.lock);
-	if (ct->dead.reason)
+	if (ct->dead.reason) {
 		ct->dead.reason |= (1 << CT_DEAD_STATE_REARM);
+		queue_work(system_unbound_wq, &ct->dead.worker);
+	}
 	spin_unlock_irq(&ct->dead.lock);
 #endif
 
@@ -708,7 +716,7 @@ static int h2g_write(struct xe_guc_ct *ct, const u32 *action, u32 len,
 	--len;
 	++action;
 
-	/* Write H2G ensuring visable before descriptor update */
+	/* Write H2G ensuring visible before descriptor update */
 	xe_map_memcpy_to(xe, &map, 0, cmd, H2G_CT_HEADERS * sizeof(u32));
 	xe_map_memcpy_to(xe, &map, H2G_CT_HEADERS * sizeof(u32), action, len * sizeof(u32));
 	xe_device_wmb(xe);
@@ -1012,33 +1020,14 @@ retry_same_fence:
 			goto retry_same_fence;
 
 		if (!g2h_fence_needs_alloc(&g2h_fence))
-			xa_erase_irq(&ct->fence_lookup, g2h_fence.seqno);
+			xa_erase(&ct->fence_lookup, g2h_fence.seqno);
 
 		return ret;
 	}
 
 	ret = wait_event_timeout(ct->g2h_fence_wq, g2h_fence.done, HZ);
-
 	if (!ret) {
 		LNL_FLUSH_WORK(&ct->g2h_worker);
-		if (g2h_fence.done) {
-			xe_gt_warn(gt, "G2H fence %u, action %04x, done\n",
-				   g2h_fence.seqno, action[0]);
-			ret = 1;
-		}
-	}
-
-	/*
-	 * Occasionally it is seen that the G2H worker starts running after a delay of more than
-	 * a second even after being queued and activated by the Linux workqueue subsystem. This
-	 * leads to G2H timeout error. The root cause of issue lies with scheduling latency of
-	 * Lunarlake Hybrid CPU. Issue dissappears if we disable Lunarlake atom cores from BIOS
-	 * and this is beyond xe kmd.
-	 *
-	 * TODO: Drop this change once workqueue scheduling delay issue is fixed on LNL Hybrid CPU.
-	 */
-	if (!ret) {
-		flush_work(&ct->g2h_worker);
 		if (g2h_fence.done) {
 			xe_gt_warn(gt, "G2H fence %u, action %04x, done\n",
 				   g2h_fence.seqno, action[0]);
@@ -1056,7 +1045,7 @@ retry_same_fence:
 	if (!ret) {
 		xe_gt_err(gt, "Timed out wait for G2H, fence %u, action %04x, done %s",
 			  g2h_fence.seqno, action[0], str_yes_no(g2h_fence.done));
-		xa_erase_irq(&ct->fence_lookup, g2h_fence.seqno);
+		xa_erase(&ct->fence_lookup, g2h_fence.seqno);
 		mutex_unlock(&ct->lock);
 		return -ETIME;
 	}
@@ -1105,6 +1094,7 @@ int xe_guc_ct_send_recv(struct xe_guc_ct *ct, const u32 *action, u32 len,
 	KUNIT_STATIC_STUB_REDIRECT(xe_guc_ct_send_recv, ct, action, len, response_buffer);
 	return guc_ct_send_recv(ct, action, len, response_buffer, false);
 }
+ALLOW_ERROR_INJECTION(xe_guc_ct_send_recv, ERRNO);
 
 int xe_guc_ct_send_recv_no_fail(struct xe_guc_ct *ct, const u32 *action,
 				u32 len, u32 *response_buffer)
@@ -1136,6 +1126,24 @@ static int parse_g2h_event(struct xe_guc_ct *ct, u32 *msg, u32 len)
 	case XE_GUC_ACTION_TLB_INVALIDATION_DONE:
 		g2h_release_space(ct, len);
 	}
+
+	return 0;
+}
+
+static int guc_crash_process_msg(struct xe_guc_ct *ct, u32 action)
+{
+	struct xe_gt *gt = ct_to_gt(ct);
+
+	if (action == XE_GUC_ACTION_NOTIFY_CRASH_DUMP_POSTED)
+		xe_gt_err(gt, "GuC Crash dump notification\n");
+	else if (action == XE_GUC_ACTION_NOTIFY_EXCEPTION)
+		xe_gt_err(gt, "GuC Exception notification\n");
+	else
+		xe_gt_err(gt, "Unknown GuC crash notification: 0x%04X\n", action);
+
+	CT_DEAD(ct, NULL, CRASH);
+
+	kick_reset(ct);
 
 	return 0;
 }
@@ -1282,6 +1290,8 @@ static int process_g2h_msg(struct xe_guc_ct *ct, u32 *msg, u32 len)
 		/* Selftest only at the moment */
 		break;
 	case XE_GUC_ACTION_STATE_CAPTURE_NOTIFICATION:
+		ret = xe_guc_error_capture_handler(guc, payload, adj_len);
+		break;
 	case XE_GUC_ACTION_NOTIFY_FLUSH_LOG_BUFFER_TO_FILE:
 		/* FIXME: Handle this */
 		break;
@@ -1312,13 +1322,17 @@ static int process_g2h_msg(struct xe_guc_ct *ct, u32 *msg, u32 len)
 	case GUC_ACTION_GUC2PF_ADVERSE_EVENT:
 		ret = xe_gt_sriov_pf_monitor_process_guc2pf(gt, hxg, hxg_len);
 		break;
+	case XE_GUC_ACTION_NOTIFY_CRASH_DUMP_POSTED:
+	case XE_GUC_ACTION_NOTIFY_EXCEPTION:
+		ret = guc_crash_process_msg(ct, action);
+		break;
 	default:
 		xe_gt_err(gt, "unexpected G2H action 0x%04x\n", action);
 	}
 
 	if (ret) {
-		xe_gt_err(gt, "G2H action 0x%04x failed (%pe)\n",
-			  action, ERR_PTR(ret));
+		xe_gt_err(gt, "G2H action %#04x failed (%pe) len %u msg %*ph\n",
+			  action, ERR_PTR(ret), hxg_len, (int)sizeof(u32) * hxg_len, hxg);
 		CT_DEAD(ct, NULL, PROCESS_FAILED);
 	}
 
@@ -1376,7 +1390,7 @@ static int g2h_read(struct xe_guc_ct *ct, u32 *msg, bool fast_path)
 		 * this function and nowhere else. Hence, they cannot be different
 		 * unless two g2h_read calls are running concurrently. Which is not
 		 * possible because it is guarded by ct->fast_lock. And yet, some
-		 * discrete platforms are reguarly hitting this error :(.
+		 * discrete platforms are regularly hitting this error :(.
 		 *
 		 * desc_head rolling backwards shouldn't cause any noticeable
 		 * problems - just a delay in GuC being allowed to proceed past that
@@ -1615,48 +1629,34 @@ static void g2h_worker_func(struct work_struct *w)
 	receive_g2h(ct);
 }
 
-static void guc_ctb_snapshot_capture(struct xe_device *xe, struct guc_ctb *ctb,
-				     struct guc_ctb_snapshot *snapshot,
-				     bool atomic)
+static struct xe_guc_ct_snapshot *guc_ct_snapshot_alloc(struct xe_guc_ct *ct, bool atomic,
+							bool want_ctb)
 {
-	u32 head, tail;
+	struct xe_guc_ct_snapshot *snapshot;
 
+	snapshot = kzalloc(sizeof(*snapshot), atomic ? GFP_ATOMIC : GFP_KERNEL);
+	if (!snapshot)
+		return NULL;
+
+	if (ct->bo && want_ctb) {
+		snapshot->ctb_size = ct->bo->size;
+		snapshot->ctb = kmalloc(snapshot->ctb_size, atomic ? GFP_ATOMIC : GFP_KERNEL);
+	}
+
+	return snapshot;
+}
+
+static void guc_ctb_snapshot_capture(struct xe_device *xe, struct guc_ctb *ctb,
+				     struct guc_ctb_snapshot *snapshot)
+{
 	xe_map_memcpy_from(xe, &snapshot->desc, &ctb->desc, 0,
 			   sizeof(struct guc_ct_buffer_desc));
 	memcpy(&snapshot->info, &ctb->info, sizeof(struct guc_ctb_info));
-
-	snapshot->cmds = kmalloc_array(ctb->info.size, sizeof(u32),
-				       atomic ? GFP_ATOMIC : GFP_KERNEL);
-	if (!snapshot->cmds) {
-		drm_err(&xe->drm, "Skipping CTB commands snapshot. Only CT info will be available.\n");
-		return;
-	}
-
-	head = snapshot->desc.head;
-	tail = snapshot->desc.tail;
-
-	if (head != tail) {
-		struct iosys_map map =
-			IOSYS_MAP_INIT_OFFSET(&ctb->cmds, head * sizeof(u32));
-
-		while (head != tail) {
-			snapshot->cmds[head] = xe_map_rd(xe, &map, 0, u32);
-			++head;
-			if (head == ctb->info.size) {
-				head = 0;
-				map = ctb->cmds;
-			} else {
-				iosys_map_incr(&map, sizeof(u32));
-			}
-		}
-	}
 }
 
 static void guc_ctb_snapshot_print(struct guc_ctb_snapshot *snapshot,
 				   struct drm_printer *p)
 {
-	u32 head, tail;
-
 	drm_printf(p, "\tsize: %d\n", snapshot->info.size);
 	drm_printf(p, "\tresv_space: %d\n", snapshot->info.resv_space);
 	drm_printf(p, "\thead: %d\n", snapshot->info.head);
@@ -1666,48 +1666,15 @@ static void guc_ctb_snapshot_print(struct guc_ctb_snapshot *snapshot,
 	drm_printf(p, "\thead (memory): %d\n", snapshot->desc.head);
 	drm_printf(p, "\ttail (memory): %d\n", snapshot->desc.tail);
 	drm_printf(p, "\tstatus (memory): 0x%x\n", snapshot->desc.status);
-
-	if (!snapshot->cmds)
-		return;
-
-	head = snapshot->desc.head;
-	tail = snapshot->desc.tail;
-
-	while (head != tail) {
-		drm_printf(p, "\tcmd[%d]: 0x%08x\n", head,
-			   snapshot->cmds[head]);
-		++head;
-		if (head == snapshot->info.size)
-			head = 0;
-	}
 }
 
-static void guc_ctb_snapshot_free(struct guc_ctb_snapshot *snapshot)
-{
-	kfree(snapshot->cmds);
-}
-
-/**
- * xe_guc_ct_snapshot_capture - Take a quick snapshot of the CT state.
- * @ct: GuC CT object.
- * @atomic: Boolean to indicate if this is called from atomic context like
- * reset or CTB handler or from some regular path like debugfs.
- *
- * This can be printed out in a later stage like during dev_coredump
- * analysis.
- *
- * Returns: a GuC CT snapshot object that must be freed by the caller
- * by using `xe_guc_ct_snapshot_free`.
- */
-struct xe_guc_ct_snapshot *xe_guc_ct_snapshot_capture(struct xe_guc_ct *ct,
-						      bool atomic)
+static struct xe_guc_ct_snapshot *guc_ct_snapshot_capture(struct xe_guc_ct *ct, bool atomic,
+							  bool want_ctb)
 {
 	struct xe_device *xe = ct_to_xe(ct);
 	struct xe_guc_ct_snapshot *snapshot;
 
-	snapshot = kzalloc(sizeof(*snapshot),
-			   atomic ? GFP_ATOMIC : GFP_KERNEL);
-
+	snapshot = guc_ct_snapshot_alloc(ct, atomic, want_ctb);
 	if (!snapshot) {
 		xe_gt_err(ct_to_gt(ct), "Skipping CTB snapshot entirely.\n");
 		return NULL;
@@ -1716,13 +1683,29 @@ struct xe_guc_ct_snapshot *xe_guc_ct_snapshot_capture(struct xe_guc_ct *ct,
 	if (xe_guc_ct_enabled(ct) || ct->state == XE_GUC_CT_STATE_STOPPED) {
 		snapshot->ct_enabled = true;
 		snapshot->g2h_outstanding = READ_ONCE(ct->g2h_outstanding);
-		guc_ctb_snapshot_capture(xe, &ct->ctbs.h2g,
-					 &snapshot->h2g, atomic);
-		guc_ctb_snapshot_capture(xe, &ct->ctbs.g2h,
-					 &snapshot->g2h, atomic);
+		guc_ctb_snapshot_capture(xe, &ct->ctbs.h2g, &snapshot->h2g);
+		guc_ctb_snapshot_capture(xe, &ct->ctbs.g2h, &snapshot->g2h);
 	}
 
+	if (ct->bo && snapshot->ctb)
+		xe_map_memcpy_from(xe, snapshot->ctb, &ct->bo->vmap, 0, snapshot->ctb_size);
+
 	return snapshot;
+}
+
+/**
+ * xe_guc_ct_snapshot_capture - Take a quick snapshot of the CT state.
+ * @ct: GuC CT object.
+ *
+ * This can be printed out in a later stage like during dev_coredump
+ * analysis. This is safe to be called during atomic context.
+ *
+ * Returns: a GuC CT snapshot object that must be freed by the caller
+ * by using `xe_guc_ct_snapshot_free`.
+ */
+struct xe_guc_ct_snapshot *xe_guc_ct_snapshot_capture(struct xe_guc_ct *ct)
+{
+	return guc_ct_snapshot_capture(ct, true, true);
 }
 
 /**
@@ -1742,11 +1725,16 @@ void xe_guc_ct_snapshot_print(struct xe_guc_ct_snapshot *snapshot,
 		drm_puts(p, "H2G CTB (all sizes in DW):\n");
 		guc_ctb_snapshot_print(&snapshot->h2g, p);
 
-		drm_puts(p, "\nG2H CTB (all sizes in DW):\n");
+		drm_puts(p, "G2H CTB (all sizes in DW):\n");
 		guc_ctb_snapshot_print(&snapshot->g2h, p);
-
 		drm_printf(p, "\tg2h outstanding: %d\n",
 			   snapshot->g2h_outstanding);
+
+		if (snapshot->ctb) {
+			drm_printf(p, "[CTB].length: 0x%zx\n", snapshot->ctb_size);
+			xe_print_blob_ascii85(p, "[CTB].data", '\n',
+					      snapshot->ctb, 0, snapshot->ctb_size);
+		}
 	} else {
 		drm_puts(p, "CT disabled\n");
 	}
@@ -1764,8 +1752,7 @@ void xe_guc_ct_snapshot_free(struct xe_guc_ct_snapshot *snapshot)
 	if (!snapshot)
 		return;
 
-	guc_ctb_snapshot_free(&snapshot->h2g);
-	guc_ctb_snapshot_free(&snapshot->g2h);
+	kfree(snapshot->ctb);
 	kfree(snapshot);
 }
 
@@ -1773,14 +1760,16 @@ void xe_guc_ct_snapshot_free(struct xe_guc_ct_snapshot *snapshot)
  * xe_guc_ct_print - GuC CT Print.
  * @ct: GuC CT.
  * @p: drm_printer where it will be printed out.
+ * @want_ctb: Should the full CTB content be dumped (vs just the headers)
  *
- * This function quickly capture a snapshot and immediately print it out.
+ * This function will quickly capture a snapshot of the CT state
+ * and immediately print it out.
  */
-void xe_guc_ct_print(struct xe_guc_ct *ct, struct drm_printer *p)
+void xe_guc_ct_print(struct xe_guc_ct *ct, struct drm_printer *p, bool want_ctb)
 {
 	struct xe_guc_ct_snapshot *snapshot;
 
-	snapshot = xe_guc_ct_snapshot_capture(ct, false);
+	snapshot = guc_ct_snapshot_capture(ct, false, want_ctb);
 	xe_guc_ct_snapshot_print(snapshot, p);
 	xe_guc_ct_snapshot_free(snapshot);
 }
@@ -1814,7 +1803,7 @@ static void ct_dead_capture(struct xe_guc_ct *ct, struct guc_ctb *ctb, u32 reaso
 		return;
 
 	snapshot_log = xe_guc_log_snapshot_capture(&guc->log, true);
-	snapshot_ct = xe_guc_ct_snapshot_capture((ct), true);
+	snapshot_ct = xe_guc_ct_snapshot_capture((ct));
 
 	spin_lock_irqsave(&ct->dead.lock, flags);
 
@@ -1846,10 +1835,10 @@ static void ct_dead_print(struct xe_dead_ct *dead)
 		return;
 	}
 
-	drm_printf(&lp, "CTB is dead - reason=0x%X\n", dead->reason);
 
 	/* Can't generate a genuine core dump at this point, so just do the good bits */
 	drm_puts(&lp, "**** Xe Device Coredump ****\n");
+	drm_printf(&lp, "Reason: CTB is dead - 0x%X\n", dead->reason);
 	xe_device_snapshot_print(xe, &lp);
 
 	drm_printf(&lp, "**** GT #%d ****\n", gt->info.id);

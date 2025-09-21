@@ -127,7 +127,7 @@ static int ip6_finish_output2(struct net *net, struct sock *sk, struct sk_buff *
 	nexthop = rt6_nexthop(dst_rt6_info(dst), daddr);
 	neigh = __ipv6_neigh_lookup_noref(dev, nexthop);
 
-	if (unlikely(IS_ERR_OR_NULL(neigh))) {
+	if (IS_ERR_OR_NULL(neigh)) {
 		if (unlikely(!neigh))
 			neigh = __neigh_create(&nd_tbl, nexthop, dev, false);
 		if (IS_ERR(neigh)) {
@@ -259,7 +259,7 @@ bool ip6_autoflowlabel(struct net *net, const struct sock *sk)
 }
 
 /*
- * xmit an sk_buff (used by TCP, SCTP and DCCP)
+ * xmit an sk_buff (used by TCP and SCTP)
  * Note : socket lock is not held for SYNACK packets, but might be modified
  * by calls to skb_set_owner_w() and ipv6_local_error(),
  * which are using proper atomic operations or spinlocks.
@@ -1402,8 +1402,12 @@ static int ip6_setup_cork(struct sock *sk, struct inet_cork_full *cork,
 	cork->base.gso_size = ipc6->gso_size;
 	cork->base.tx_flags = 0;
 	cork->base.mark = ipc6->sockc.mark;
-	sock_tx_timestamp(sk, ipc6->sockc.tsflags, &cork->base.tx_flags);
-
+	cork->base.priority = ipc6->sockc.priority;
+	sock_tx_timestamp(sk, &ipc6->sockc, &cork->base.tx_flags);
+	if (ipc6->sockc.tsflags & SOCKCM_FLAG_TS_OPT_ID) {
+		cork->base.flags |= IPCORK_TS_OPT_ID;
+		cork->base.ts_opt_id = ipc6->sockc.ts_opt_id;
+	}
 	cork->base.length = 0;
 	cork->base.transmit_time = ipc6->sockc.transmit_time;
 
@@ -1434,7 +1438,7 @@ static int __ip6_append_data(struct sock *sk,
 	bool zc = false;
 	u32 tskey = 0;
 	struct rt6_info *rt = dst_rt6_info(cork->dst);
-	bool paged, hold_tskey, extra_uref = false;
+	bool paged, hold_tskey = false, extra_uref = false;
 	struct ipv6_txoptions *opt = v6_cork->opt;
 	int csummode = CHECKSUM_NONE;
 	unsigned int maxnonfragsize, headersize;
@@ -1520,7 +1524,8 @@ emsgsize:
 				uarg = msg->msg_ubuf;
 			}
 		} else if (sock_flag(sk, SOCK_ZEROCOPY)) {
-			uarg = msg_zerocopy_realloc(sk, length, skb_zcopy(skb));
+			uarg = msg_zerocopy_realloc(sk, length, skb_zcopy(skb),
+						    false);
 			if (!uarg)
 				return -ENOBUFS;
 			extra_uref = !skb_zcopy(skb);	/* only ref on new uarg */
@@ -1544,10 +1549,15 @@ emsgsize:
 			flags &= ~MSG_SPLICE_PAGES;
 	}
 
-	hold_tskey = cork->tx_flags & SKBTX_ANY_TSTAMP &&
-		     READ_ONCE(sk->sk_tsflags) & SOF_TIMESTAMPING_OPT_ID;
-	if (hold_tskey)
-		tskey = atomic_inc_return(&sk->sk_tskey) - 1;
+	if (cork->tx_flags & SKBTX_ANY_TSTAMP &&
+	    READ_ONCE(sk->sk_tsflags) & SOF_TIMESTAMPING_OPT_ID) {
+		if (cork->flags & IPCORK_TS_OPT_ID) {
+			tskey = cork->ts_opt_id;
+		} else {
+			tskey = atomic_inc_return(&sk->sk_tskey) - 1;
+			hold_tskey = true;
+		}
+	}
 
 	/*
 	 * Let's try using as much space as possible.
@@ -1690,8 +1700,9 @@ alloc_new_skb:
 				pskb_trim_unique(skb_prev, maxfraglen);
 			}
 			if (copy > 0 &&
-			    getfrag(from, data + transhdrlen, offset,
-				    copy, fraggap, skb) < 0) {
+			    INDIRECT_CALL_1(getfrag, ip_generic_getfrag,
+					   from, data + transhdrlen, offset,
+					   copy, fraggap, skb) < 0) {
 				err = -EFAULT;
 				kfree_skb(skb);
 				goto error;
@@ -1735,8 +1746,9 @@ alloc_new_skb:
 			unsigned int off;
 
 			off = skb->len;
-			if (getfrag(from, skb_put(skb, copy),
-						offset, copy, off, skb) < 0) {
+			if (INDIRECT_CALL_1(getfrag, ip_generic_getfrag,
+					    from, skb_put(skb, copy),
+					    offset, copy, off, skb) < 0) {
 				__skb_trim(skb, off);
 				err = -EFAULT;
 				goto error;
@@ -1774,7 +1786,8 @@ alloc_new_skb:
 				get_page(pfrag->page);
 			}
 			copy = min_t(int, copy, pfrag->size - pfrag->offset);
-			if (getfrag(from,
+			if (INDIRECT_CALL_1(getfrag, ip_generic_getfrag,
+				    from,
 				    page_address(pfrag->page) + pfrag->offset,
 				    offset, copy, skb->len, skb) < 0)
 				goto error_efault;
@@ -1932,7 +1945,7 @@ struct sk_buff *__ip6_make_skb(struct sock *sk,
 	hdr->saddr = fl6->saddr;
 	hdr->daddr = *final_dst;
 
-	skb->priority = READ_ONCE(sk->sk_priority);
+	skb->priority = cork->base.priority;
 	skb->mark = cork->base.mark;
 	if (sk_is_tcp(sk))
 		skb_set_delivery_time(skb, cork->base.transmit_time, SKB_CLOCK_MONOTONIC);

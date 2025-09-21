@@ -84,9 +84,12 @@ struct btrfs_fs_context {
 	u32 thread_pool_size;
 	unsigned long long mount_opt;
 	unsigned long compress_type:4;
-	unsigned int compress_level;
+	int compress_level;
 	refcount_t refs;
 };
+
+static void btrfs_emit_options(struct btrfs_fs_info *info,
+			       struct btrfs_fs_context *old);
 
 enum {
 	Opt_acl,
@@ -125,7 +128,6 @@ enum {
 	/* Rescue options */
 	Opt_rescue,
 	Opt_usebackuproot,
-	Opt_nologreplay,
 
 	/* Debugging options */
 	Opt_enospc_debug,
@@ -246,8 +248,6 @@ static const struct fs_parameter_spec btrfs_fs_parameters[] = {
 
 	/* Rescue options. */
 	fsparam_enum("rescue", Opt_rescue, btrfs_parameter_rescue),
-	/* Deprecated, with alias rescue=nologreplay */
-	__fsparam(NULL, "nologreplay", Opt_nologreplay, fs_param_deprecated, NULL),
 	/* Deprecated, with alias rescue=usebackuproot */
 	__fsparam(NULL, "usebackuproot", Opt_usebackuproot, fs_param_deprecated, NULL),
 	/* For compatibility only, alias for "rescue=nologreplay". */
@@ -448,11 +448,6 @@ static int btrfs_parse_param(struct fs_context *fc, struct fs_parameter *param)
 			btrfs_set_opt(ctx->mount_opt, NOTREELOG);
 		else
 			btrfs_clear_opt(ctx->mount_opt, NOTREELOG);
-		break;
-	case Opt_nologreplay:
-		btrfs_warn(NULL,
-		"'nologreplay' is deprecated, use 'rescue=nologreplay' instead");
-		btrfs_set_opt(ctx->mount_opt, NOLOGREPLAY);
 		break;
 	case Opt_norecovery:
 		btrfs_info(NULL,
@@ -697,12 +692,9 @@ bool btrfs_check_options(const struct btrfs_fs_info *info,
 
 	if (!test_bit(BTRFS_FS_STATE_REMOUNTING, &info->fs_state)) {
 		if (btrfs_raw_test_opt(*mount_opt, SPACE_CACHE)) {
-			btrfs_info(info, "disk space caching is enabled");
 			btrfs_warn(info,
 "space cache v1 is being deprecated and will be removed in a future release, please use -o space_cache=v2");
 		}
-		if (btrfs_raw_test_opt(*mount_opt, FREE_SPACE_TREE))
-			btrfs_info(info, "using free-space-tree");
 	}
 
 	return ret;
@@ -951,7 +943,7 @@ static int get_default_subvol_objectid(struct btrfs_fs_info *fs_info, u64 *objec
 static int btrfs_fill_super(struct super_block *sb,
 			    struct btrfs_fs_devices *fs_devices)
 {
-	struct inode *inode;
+	struct btrfs_inode *inode;
 	struct btrfs_fs_info *fs_info = btrfs_sb(sb);
 	int err;
 
@@ -965,7 +957,7 @@ static int btrfs_fill_super(struct super_block *sb,
 #endif
 	sb->s_xattr = btrfs_xattr_handlers;
 	sb->s_time_gran = 1;
-	sb->s_iflags |= SB_I_CGROUPWB;
+	sb->s_iflags |= SB_I_CGROUPWB | SB_I_ALLOW_HSM;
 
 	err = super_setup_bdi(sb);
 	if (err) {
@@ -979,6 +971,8 @@ static int btrfs_fill_super(struct super_block *sb,
 		return err;
 	}
 
+	btrfs_emit_options(fs_info, NULL);
+
 	inode = btrfs_iget(BTRFS_FIRST_FREE_OBJECTID, fs_info->fs_root);
 	if (IS_ERR(inode)) {
 		err = PTR_ERR(inode);
@@ -986,7 +980,7 @@ static int btrfs_fill_super(struct super_block *sb,
 		goto fail_close;
 	}
 
-	sb->s_root = d_make_root(inode);
+	sb->s_root = d_make_root(&inode->vfs_inode);
 	if (!sb->s_root) {
 		err = -ENOMEM;
 		goto fail_close;
@@ -1152,11 +1146,11 @@ static int btrfs_show_options(struct seq_file *seq, struct dentry *dentry)
 /*
  * subvolumes are identified by ino 256
  */
-static inline int is_subvolume_inode(struct inode *inode)
+static inline bool is_subvolume_inode(struct inode *inode)
 {
 	if (inode && inode->i_ino == BTRFS_FIRST_FREE_OBJECTID)
-		return 1;
-	return 0;
+		return true;
+	return false;
 }
 
 static struct dentry *mount_subvol(const char *subvol_name, u64 subvol_objectid,
@@ -1436,7 +1430,7 @@ static void btrfs_emit_options(struct btrfs_fs_info *info,
 {
 	btrfs_info_if_set(info, old, NODATASUM, "setting nodatasum");
 	btrfs_info_if_set(info, old, DEGRADED, "allowing degraded mounts");
-	btrfs_info_if_set(info, old, NODATASUM, "setting nodatasum");
+	btrfs_info_if_set(info, old, NODATACOW, "setting nodatacow");
 	btrfs_info_if_set(info, old, SSD, "enabling ssd optimizations");
 	btrfs_info_if_set(info, old, SSD_SPREAD, "using spread ssd allocation scheme");
 	btrfs_info_if_set(info, old, NOBARRIER, "turning off barriers");
@@ -1458,10 +1452,11 @@ static void btrfs_emit_options(struct btrfs_fs_info *info,
 	btrfs_info_if_set(info, old, IGNOREMETACSUMS, "ignoring meta csums");
 	btrfs_info_if_set(info, old, IGNORESUPERFLAGS, "ignoring unknown super block flags");
 
+	btrfs_info_if_unset(info, old, NODATASUM, "setting datasum");
 	btrfs_info_if_unset(info, old, NODATACOW, "setting datacow");
 	btrfs_info_if_unset(info, old, SSD, "not using ssd optimizations");
 	btrfs_info_if_unset(info, old, SSD_SPREAD, "not using spread ssd allocation scheme");
-	btrfs_info_if_unset(info, old, NOBARRIER, "turning off barriers");
+	btrfs_info_if_unset(info, old, NOBARRIER, "turning on barriers");
 	btrfs_info_if_unset(info, old, NOTREELOG, "enabling tree log");
 	btrfs_info_if_unset(info, old, SPACE_CACHE, "disabling disk space caching");
 	btrfs_info_if_unset(info, old, FREE_SPACE_TREE, "disabling free space tree");
@@ -2180,7 +2175,8 @@ static struct file_system_type btrfs_fs_type = {
 	.init_fs_context	= btrfs_init_fs_context,
 	.parameters		= btrfs_fs_parameters,
 	.kill_sb		= btrfs_kill_super,
-	.fs_flags		= FS_REQUIRES_DEV | FS_BINARY_MOUNTDATA | FS_ALLOW_IDMAP,
+	.fs_flags		= FS_REQUIRES_DEV | FS_BINARY_MOUNTDATA |
+				  FS_ALLOW_IDMAP | FS_MGTIME,
  };
 
 MODULE_ALIAS_FS("btrfs");
@@ -2245,7 +2241,10 @@ static long btrfs_control_ioctl(struct file *file, unsigned int cmd,
 		device = btrfs_scan_one_device(vol->name, BLK_OPEN_READ, false);
 		if (IS_ERR_OR_NULL(device)) {
 			mutex_unlock(&uuid_mutex);
-			ret = PTR_ERR(device);
+			if (IS_ERR(device))
+				ret = PTR_ERR(device);
+			else
+				ret = 0;
 			break;
 		}
 		ret = !(device->fs_devices->num_devices ==
@@ -2292,7 +2291,7 @@ static int check_dev_super(struct btrfs_device *dev)
 		return 0;
 
 	/* Only need to check the primary super block. */
-	sb = btrfs_read_dev_one_super(dev->bdev, 0, true);
+	sb = btrfs_read_disk_super(dev->bdev, 0, true);
 	if (IS_ERR(sb))
 		return PTR_ERR(sb);
 
@@ -2384,13 +2383,7 @@ static long btrfs_nr_cached_objects(struct super_block *sb, struct shrink_contro
 
 	trace_btrfs_extent_map_shrinker_count(fs_info, nr);
 
-	/*
-	 * Only report the real number for DEBUG builds, as there are reports of
-	 * serious performance degradation caused by too frequent shrinks.
-	 */
-	if (IS_ENABLED(CONFIG_BTRFS_DEBUG))
-		return nr;
-	return 0;
+	return nr;
 }
 
 static long btrfs_free_cached_objects(struct super_block *sb, struct shrink_control *sc)
@@ -2451,6 +2444,9 @@ static __cold void btrfs_interface_exit(void)
 static int __init btrfs_print_mod_info(void)
 {
 	static const char options[] = ""
+#ifdef CONFIG_BTRFS_EXPERIMENTAL
+			", experimental=on"
+#endif
 #ifdef CONFIG_BTRFS_DEBUG
 			", debug=on"
 #endif
@@ -2471,7 +2467,17 @@ static int __init btrfs_print_mod_info(void)
 			", fsverity=no"
 #endif
 			;
+
+#ifdef CONFIG_BTRFS_EXPERIMENTAL
+	if (btrfs_get_mod_read_policy() == NULL)
+		pr_info("Btrfs loaded%s\n", options);
+	else
+		pr_info("Btrfs loaded%s, read_policy=%s\n",
+			 options, btrfs_get_mod_read_policy());
+#else
 	pr_info("Btrfs loaded%s\n", options);
+#endif
+
 	return 0;
 }
 
@@ -2518,8 +2524,8 @@ static const struct init_sequence mod_init_seq[] = {
 		.init_func = btrfs_free_space_init,
 		.exit_func = btrfs_free_space_exit,
 	}, {
-		.init_func = extent_state_init_cachep,
-		.exit_func = extent_state_free_cachep,
+		.init_func = btrfs_extent_state_init_cachep,
+		.exit_func = btrfs_extent_state_free_cachep,
 	}, {
 		.init_func = extent_buffer_init_cachep,
 		.exit_func = extent_buffer_free_cachep,
@@ -2527,8 +2533,13 @@ static const struct init_sequence mod_init_seq[] = {
 		.init_func = btrfs_bioset_init,
 		.exit_func = btrfs_bioset_exit,
 	}, {
-		.init_func = extent_map_init,
-		.exit_func = extent_map_exit,
+		.init_func = btrfs_extent_map_init,
+		.exit_func = btrfs_extent_map_exit,
+#ifdef CONFIG_BTRFS_EXPERIMENTAL
+	}, {
+		.init_func = btrfs_read_policy_init,
+		.exit_func = NULL,
+#endif
 	}, {
 		.init_func = ordered_data_init,
 		.exit_func = ordered_data_exit,

@@ -2069,9 +2069,15 @@ static int stm32_spi_probe(struct platform_device *pdev)
 	struct resource *res;
 	struct reset_control *rst;
 	struct device_node *np = pdev->dev.of_node;
+	const struct stm32_spi_cfg *cfg;
 	bool device_mode;
 	int ret;
-	const struct stm32_spi_cfg *cfg = of_device_get_match_data(&pdev->dev);
+
+	cfg = of_device_get_match_data(&pdev->dev);
+	if (!cfg) {
+		dev_err(&pdev->dev, "Failed to get match data for platform\n");
+		return -ENODEV;
+	}
 
 	device_mode = of_property_read_bool(np, "spi-slave");
 	if (!cfg->has_device_mode && device_mode) {
@@ -2356,7 +2362,7 @@ static const struct dev_pm_ops stm32_spi_pm_ops = {
 
 static struct platform_driver stm32_spi_driver = {
 	.probe = stm32_spi_probe,
-	.remove_new = stm32_spi_remove,
+	.remove = stm32_spi_remove,
 	.driver = {
 		.name = DRIVER_NAME,
 		.pm = &stm32_spi_pm_ops,

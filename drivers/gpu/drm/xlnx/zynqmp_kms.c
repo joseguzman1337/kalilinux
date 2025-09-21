@@ -9,6 +9,7 @@
  * - Laurent Pinchart <laurent.pinchart@ideasonboard.com>
  */
 
+#include <drm/clients/drm_client_setup.h>
 #include <drm/drm_atomic.h>
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_blend.h>
@@ -402,12 +403,12 @@ static const struct drm_driver zynqmp_dpsub_drm_driver = {
 					  DRIVER_ATOMIC,
 
 	DRM_GEM_DMA_DRIVER_OPS_WITH_DUMB_CREATE(zynqmp_dpsub_dumb_create),
+	DRM_FBDEV_DMA_DRIVER_OPS,
 
 	.fops				= &zynqmp_dpsub_drm_fops,
 
 	.name				= "zynqmp-dpsub",
 	.desc				= "Xilinx DisplayPort Subsystem Driver",
-	.date				= "20130509",
 	.major				= 1,
 	.minor				= 0,
 };
@@ -523,7 +524,7 @@ int zynqmp_dpsub_drm_init(struct zynqmp_dpsub *dpsub)
 		goto err_poll_fini;
 
 	/* Initialize fbdev generic emulation. */
-	drm_fbdev_dma_setup(drm, 24);
+	drm_client_setup_with_fourcc(drm, DRM_FORMAT_RGB888);
 
 	return 0;
 

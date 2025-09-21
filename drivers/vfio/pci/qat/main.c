@@ -614,6 +614,7 @@ static const struct vfio_device_ops qat_vf_pci_ops = {
 	.mmap = vfio_pci_core_mmap,
 	.request = vfio_pci_core_request,
 	.match = vfio_pci_core_match,
+	.match_token_uuid = vfio_pci_core_match_token_uuid,
 	.bind_iommufd = vfio_iommufd_physical_bind,
 	.unbind_iommufd = vfio_iommufd_physical_unbind,
 	.attach_ioas = vfio_iommufd_physical_attach_ioas,
@@ -697,4 +698,4 @@ module_pci_driver(qat_vf_vfio_pci_driver);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Xin Zeng <xin.zeng@intel.com>");
 MODULE_DESCRIPTION("QAT VFIO PCI - VFIO PCI driver with live migration support for Intel(R) QAT GEN4 device family");
-MODULE_IMPORT_NS(CRYPTO_QAT);
+MODULE_IMPORT_NS("CRYPTO_QAT");

@@ -2085,7 +2085,7 @@ static int wsa884x_probe(struct sdw_slave *pdev,
 	wsa884x->sconfig.direction = SDW_DATA_DIR_RX;
 	wsa884x->sconfig.type = SDW_STREAM_PDM;
 
-	/**
+	/*
 	 * Port map index starts with 0, however the data port for this codec
 	 * are from index 1
 	 */
@@ -2136,7 +2136,7 @@ static int wsa884x_probe(struct sdw_slave *pdev,
 					       ARRAY_SIZE(wsa884x_dais));
 }
 
-static int __maybe_unused wsa884x_runtime_suspend(struct device *dev)
+static int wsa884x_runtime_suspend(struct device *dev)
 {
 	struct regmap *regmap = dev_get_regmap(dev, NULL);
 
@@ -2146,7 +2146,7 @@ static int __maybe_unused wsa884x_runtime_suspend(struct device *dev)
 	return 0;
 }
 
-static int __maybe_unused wsa884x_runtime_resume(struct device *dev)
+static int wsa884x_runtime_resume(struct device *dev)
 {
 	struct regmap *regmap = dev_get_regmap(dev, NULL);
 
@@ -2157,7 +2157,7 @@ static int __maybe_unused wsa884x_runtime_resume(struct device *dev)
 }
 
 static const struct dev_pm_ops wsa884x_pm_ops = {
-	SET_RUNTIME_PM_OPS(wsa884x_runtime_suspend, wsa884x_runtime_resume, NULL)
+	RUNTIME_PM_OPS(wsa884x_runtime_suspend, wsa884x_runtime_resume, NULL)
 };
 
 static const struct sdw_device_id wsa884x_swr_id[] = {
@@ -2169,7 +2169,7 @@ MODULE_DEVICE_TABLE(sdw, wsa884x_swr_id);
 static struct sdw_driver wsa884x_codec_driver = {
 	.driver = {
 		.name = "wsa884x-codec",
-		.pm = &wsa884x_pm_ops,
+		.pm = pm_ptr(&wsa884x_pm_ops),
 	},
 	.probe = wsa884x_probe,
 	.ops = &wsa884x_slave_ops,

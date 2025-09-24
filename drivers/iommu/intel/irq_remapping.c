@@ -24,7 +24,6 @@
 #include "iommu.h"
 #include "../irq_remapping.h"
 #include "../iommu-pages.h"
-#include "cap_audit.h"
 
 struct ioapic_scope {
 	struct intel_iommu *iommu;
@@ -304,7 +303,7 @@ static int set_ioapic_sid(struct irte *irte, int apic)
 
 	for (i = 0; i < MAX_IO_APICS; i++) {
 		if (ir_ioapic[i].iommu && ir_ioapic[i].id == apic) {
-			sid = (ir_ioapic[i].bus << 8) | ir_ioapic[i].devfn;
+			sid = PCI_DEVID(ir_ioapic[i].bus, ir_ioapic[i].devfn);
 			break;
 		}
 	}
@@ -329,7 +328,7 @@ static int set_hpet_sid(struct irte *irte, u8 id)
 
 	for (i = 0; i < MAX_HPET_TBS; i++) {
 		if (ir_hpet[i].iommu && ir_hpet[i].id == id) {
-			sid = (ir_hpet[i].bus << 8) | ir_hpet[i].devfn;
+			sid = PCI_DEVID(ir_hpet[i].bus, ir_hpet[i].devfn);
 			break;
 		}
 	}
@@ -531,11 +530,11 @@ static int intel_setup_irq_remapping(struct intel_iommu *iommu)
 	if (!ir_table)
 		return -ENOMEM;
 
-	ir_table_base = iommu_alloc_pages_node(iommu->node, GFP_KERNEL,
-					       INTR_REMAP_PAGE_ORDER);
+	/* 1MB - maximum possible interrupt remapping table size */
+	ir_table_base =
+		iommu_alloc_pages_node_sz(iommu->node, GFP_KERNEL, SZ_1M);
 	if (!ir_table_base) {
-		pr_err("IR%d: failed to allocate pages of order %d\n",
-		       iommu->seq_id, INTR_REMAP_PAGE_ORDER);
+		pr_err("IR%d: failed to allocate 1M of pages\n", iommu->seq_id);
 		goto out_free_table;
 	}
 
@@ -613,7 +612,7 @@ out_free_fwnode:
 out_free_bitmap:
 	bitmap_free(bitmap);
 out_free_pages:
-	iommu_free_pages(ir_table_base, INTR_REMAP_PAGE_ORDER);
+	iommu_free_pages(ir_table_base);
 out_free_table:
 	kfree(ir_table);
 
@@ -634,7 +633,7 @@ static void intel_teardown_irq_remapping(struct intel_iommu *iommu)
 			irq_domain_free_fwnode(fn);
 			iommu->ir_domain = NULL;
 		}
-		iommu_free_pages(iommu->ir_table->base, INTR_REMAP_PAGE_ORDER);
+		iommu_free_pages(iommu->ir_table->base);
 		bitmap_free(iommu->ir_table->bitmap);
 		kfree(iommu->ir_table);
 		iommu->ir_table = NULL;
@@ -717,9 +716,6 @@ static int __init intel_prepare_irq_remapping(void)
 	}
 
 	if (dmar_table_init() < 0)
-		return -ENODEV;
-
-	if (intel_cap_audit(CAP_AUDIT_STATIC_IRQR, NULL))
 		return -ENODEV;
 
 	if (!dmar_ir_support())
@@ -1473,7 +1469,6 @@ static int intel_irq_remapping_alloc(struct irq_domain *domain,
 		else
 			irq_data->chip = &intel_ir_chip;
 		intel_irq_remapping_prepare_irte(ird, irq_cfg, info, index, i);
-		irq_set_status_flags(virq + i, IRQ_MOVE_PCNTXT);
 	}
 	return 0;
 
@@ -1546,10 +1541,6 @@ static int dmar_ir_add(struct dmar_drhd_unit *dmaru, struct intel_iommu *iommu)
 {
 	int ret;
 	int eim = x2apic_enabled();
-
-	ret = intel_cap_audit(CAP_AUDIT_HOTPLUG_IRQR, iommu);
-	if (ret)
-		return ret;
 
 	if (eim && !ecap_eim_support(iommu->ecap)) {
 		pr_info("DRHD %Lx: EIM not supported by DRHD, ecap %Lx\n",

@@ -17,8 +17,6 @@
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/io.h>
-#include <linux/gpio.h>
-#include <linux/gpio/consumer.h>
 #include <linux/interrupt.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
@@ -26,7 +24,6 @@
 #include <linux/platform_device.h>
 #include <linux/phylink.h>
 #include <linux/of.h>
-#include <linux/of_gpio.h>
 #include <linux/of_mdio.h>
 #include <linux/of_net.h>
 #include <linux/ip.h>
@@ -530,19 +527,9 @@ static void macb_set_tx_clk(struct macb *bp, int speed)
 	if (bp->phy_interface == PHY_INTERFACE_MODE_MII)
 		return;
 
-	switch (speed) {
-	case SPEED_10:
-		rate = 2500000;
-		break;
-	case SPEED_100:
-		rate = 25000000;
-		break;
-	case SPEED_1000:
-		rate = 125000000;
-		break;
-	default:
+	rate = rgmii_clock(speed);
+	if (rate < 0)
 		return;
-	}
 
 	rate_rounded = clk_round_rate(bp->tx_clk, rate);
 	if (rate_rounded < 0)
@@ -578,6 +565,7 @@ static void macb_usx_pcs_link_up(struct phylink_pcs *pcs, unsigned int neg_mode,
 }
 
 static void macb_usx_pcs_get_state(struct phylink_pcs *pcs,
+				   unsigned int neg_mode,
 				   struct phylink_link_state *state)
 {
 	struct macb *bp = container_of(pcs, struct macb, phylink_usx_pcs);
@@ -608,7 +596,7 @@ static int macb_usx_pcs_config(struct phylink_pcs *pcs,
 	return 0;
 }
 
-static void macb_pcs_get_state(struct phylink_pcs *pcs,
+static void macb_pcs_get_state(struct phylink_pcs *pcs, unsigned int neg_mode,
 			       struct phylink_link_state *state)
 {
 	state->link = 0;
@@ -862,9 +850,7 @@ static int macb_mii_probe(struct net_device *dev)
 	struct macb *bp = netdev_priv(dev);
 
 	bp->phylink_sgmii_pcs.ops = &macb_phylink_pcs_ops;
-	bp->phylink_sgmii_pcs.neg_mode = true;
 	bp->phylink_usx_pcs.ops = &macb_phylink_usx_pcs_ops;
-	bp->phylink_usx_pcs.neg_mode = true;
 
 	bp->phylink_config.dev = &dev->dev;
 	bp->phylink_config.type = PHYLINK_NETDEV;
@@ -915,20 +901,15 @@ static int macb_mii_probe(struct net_device *dev)
 	return 0;
 }
 
-static int macb_mdiobus_register(struct macb *bp)
+static int macb_mdiobus_register(struct macb *bp, struct device_node *mdio_np)
 {
 	struct device_node *child, *np = bp->pdev->dev.of_node;
 
 	/* If we have a child named mdio, probe it instead of looking for PHYs
 	 * directly under the MAC node
 	 */
-	child = of_get_child_by_name(np, "mdio");
-	if (child) {
-		int ret = of_mdiobus_register(bp->mii_bus, child);
-
-		of_node_put(child);
-		return ret;
-	}
+	if (mdio_np)
+		return of_mdiobus_register(bp->mii_bus, mdio_np);
 
 	/* Only create the PHY from the device tree if at least one PHY is
 	 * described. Otherwise scan the entire MDIO bus. We do this to support
@@ -950,17 +931,15 @@ static int macb_mdiobus_register(struct macb *bp)
 
 static int macb_mii_init(struct macb *bp)
 {
-	struct device_node *child, *np = bp->pdev->dev.of_node;
+	struct device_node *mdio_np, *np = bp->pdev->dev.of_node;
 	int err = -ENXIO;
 
 	/* With fixed-link, we don't need to register the MDIO bus,
 	 * except if we have a child named "mdio" in the device tree.
 	 * In that case, some devices may be attached to the MACB's MDIO bus.
 	 */
-	child = of_get_child_by_name(np, "mdio");
-	if (child)
-		of_node_put(child);
-	else if (of_phy_is_fixed_link(np))
+	mdio_np = of_get_child_by_name(np, "mdio");
+	if (!mdio_np && of_phy_is_fixed_link(np))
 		return macb_mii_probe(bp->dev);
 
 	/* Enable management port */
@@ -984,7 +963,7 @@ static int macb_mii_init(struct macb *bp)
 
 	dev_set_drvdata(&bp->dev->dev, bp->mii_bus);
 
-	err = macb_mdiobus_register(bp);
+	err = macb_mdiobus_register(bp, mdio_np);
 	if (err)
 		goto err_out_free_mdiobus;
 
@@ -999,13 +978,15 @@ err_out_unregister_bus:
 err_out_free_mdiobus:
 	mdiobus_free(bp->mii_bus);
 err_out:
+	of_node_put(mdio_np);
+
 	return err;
 }
 
 static void macb_update_stats(struct macb *bp)
 {
-	u32 *p = &bp->hw_stats.macb.rx_pause_frames;
-	u32 *end = &bp->hw_stats.macb.tx_pause_frames + 1;
+	u64 *p = &bp->hw_stats.macb.rx_pause_frames;
+	u64 *end = &bp->hw_stats.macb.tx_pause_frames + 1;
 	int offset = MACB_PFR;
 
 	WARN_ON((unsigned long)(end - p - 1) != (MACB_TPF - MACB_PFR) / 4);
@@ -1088,15 +1069,18 @@ static void macb_tx_error_task(struct work_struct *work)
 						      tx_error_task);
 	bool			halt_timeout = false;
 	struct macb		*bp = queue->bp;
+	u32			queue_index;
+	u32			packets = 0;
+	u32			bytes = 0;
 	struct macb_tx_skb	*tx_skb;
 	struct macb_dma_desc	*desc;
 	struct sk_buff		*skb;
 	unsigned int		tail;
 	unsigned long		flags;
 
+	queue_index = queue - bp->queues;
 	netdev_vdbg(bp->dev, "macb_tx_error_task: q = %u, t = %u, h = %u\n",
-		    (unsigned int)(queue - bp->queues),
-		    queue->tx_tail, queue->tx_head);
+		    queue_index, queue->tx_tail, queue->tx_head);
 
 	/* Prevent the queue NAPI TX poll from running, as it calls
 	 * macb_tx_complete(), which in turn may call netif_wake_subqueue().
@@ -1149,8 +1133,10 @@ static void macb_tx_error_task(struct work_struct *work)
 					    skb->data);
 				bp->dev->stats.tx_packets++;
 				queue->stats.tx_packets++;
+				packets++;
 				bp->dev->stats.tx_bytes += skb->len;
 				queue->stats.tx_bytes += skb->len;
+				bytes += skb->len;
 			}
 		} else {
 			/* "Buffers exhausted mid-frame" errors may only happen
@@ -1166,6 +1152,9 @@ static void macb_tx_error_task(struct work_struct *work)
 
 		macb_tx_unmap(bp, tx_skb, 0);
 	}
+
+	netdev_tx_completed_queue(netdev_get_tx_queue(bp->dev, queue_index),
+				  packets, bytes);
 
 	/* Set end of TX queue */
 	desc = macb_tx_desc(queue, 0);
@@ -1234,11 +1223,13 @@ static int macb_tx_complete(struct macb_queue *queue, int budget)
 {
 	struct macb *bp = queue->bp;
 	u16 queue_index = queue - bp->queues;
+	unsigned long flags;
 	unsigned int tail;
 	unsigned int head;
 	int packets = 0;
+	u32 bytes = 0;
 
-	spin_lock(&queue->tx_ptr_lock);
+	spin_lock_irqsave(&queue->tx_ptr_lock, flags);
 	head = queue->tx_head;
 	for (tail = queue->tx_tail; tail != head && packets < budget; tail++) {
 		struct macb_tx_skb	*tx_skb;
@@ -1278,6 +1269,7 @@ static int macb_tx_complete(struct macb_queue *queue, int budget)
 				bp->dev->stats.tx_bytes += skb->len;
 				queue->stats.tx_bytes += skb->len;
 				packets++;
+				bytes += skb->len;
 			}
 
 			/* Now we can safely release resources */
@@ -1292,12 +1284,15 @@ static int macb_tx_complete(struct macb_queue *queue, int budget)
 		}
 	}
 
+	netdev_tx_completed_queue(netdev_get_tx_queue(bp->dev, queue_index),
+				  packets, bytes);
+
 	queue->tx_tail = tail;
 	if (__netif_subqueue_stopped(bp->dev, queue_index) &&
 	    CIRC_CNT(queue->tx_head, queue->tx_tail,
 		     bp->tx_ring_size) <= MACB_TX_WAKEUP_THRESH(bp))
 		netif_wake_subqueue(bp->dev, queue_index);
-	spin_unlock(&queue->tx_ptr_lock);
+	spin_unlock_irqrestore(&queue->tx_ptr_lock, flags);
 
 	return packets;
 }
@@ -1713,8 +1708,9 @@ static void macb_tx_restart(struct macb_queue *queue)
 {
 	struct macb *bp = queue->bp;
 	unsigned int head_idx, tbqp;
+	unsigned long flags;
 
-	spin_lock(&queue->tx_ptr_lock);
+	spin_lock_irqsave(&queue->tx_ptr_lock, flags);
 
 	if (queue->tx_head == queue->tx_tail)
 		goto out_tx_ptr_unlock;
@@ -1726,19 +1722,20 @@ static void macb_tx_restart(struct macb_queue *queue)
 	if (tbqp == head_idx)
 		goto out_tx_ptr_unlock;
 
-	spin_lock_irq(&bp->lock);
+	spin_lock(&bp->lock);
 	macb_writel(bp, NCR, macb_readl(bp, NCR) | MACB_BIT(TSTART));
-	spin_unlock_irq(&bp->lock);
+	spin_unlock(&bp->lock);
 
 out_tx_ptr_unlock:
-	spin_unlock(&queue->tx_ptr_lock);
+	spin_unlock_irqrestore(&queue->tx_ptr_lock, flags);
 }
 
 static bool macb_tx_complete_pending(struct macb_queue *queue)
 {
 	bool retval = false;
+	unsigned long flags;
 
-	spin_lock(&queue->tx_ptr_lock);
+	spin_lock_irqsave(&queue->tx_ptr_lock, flags);
 	if (queue->tx_head != queue->tx_tail) {
 		/* Make hw descriptor updates visible to CPU */
 		rmb();
@@ -1746,7 +1743,7 @@ static bool macb_tx_complete_pending(struct macb_queue *queue)
 		if (macb_tx_desc(queue, queue->tx_tail)->ctrl & MACB_BIT(TX_USED))
 			retval = true;
 	}
-	spin_unlock(&queue->tx_ptr_lock);
+	spin_unlock_irqrestore(&queue->tx_ptr_lock, flags);
 	return retval;
 }
 
@@ -2314,6 +2311,7 @@ static netdev_tx_t macb_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	struct macb_queue *queue = &bp->queues[queue_index];
 	unsigned int desc_cnt, nr_frags, frag_size, f;
 	unsigned int hdrlen;
+	unsigned long flags;
 	bool is_lso;
 	netdev_tx_t ret = NETDEV_TX_OK;
 
@@ -2374,7 +2372,7 @@ static netdev_tx_t macb_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		desc_cnt += DIV_ROUND_UP(frag_size, bp->max_tx_length);
 	}
 
-	spin_lock_bh(&queue->tx_ptr_lock);
+	spin_lock_irqsave(&queue->tx_ptr_lock, flags);
 
 	/* This is a hard error, log it. */
 	if (CIRC_SPACE(queue->tx_head, queue->tx_tail,
@@ -2395,16 +2393,18 @@ static netdev_tx_t macb_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	/* Make newly initialized descriptor visible to hardware */
 	wmb();
 	skb_tx_timestamp(skb);
+	netdev_tx_sent_queue(netdev_get_tx_queue(bp->dev, queue_index),
+			     skb->len);
 
-	spin_lock_irq(&bp->lock);
+	spin_lock(&bp->lock);
 	macb_writel(bp, NCR, macb_readl(bp, NCR) | MACB_BIT(TSTART));
-	spin_unlock_irq(&bp->lock);
+	spin_unlock(&bp->lock);
 
 	if (CIRC_SPACE(queue->tx_head, queue->tx_tail, bp->tx_ring_size) < 1)
 		netif_stop_subqueue(dev, queue_index);
 
 unlock:
-	spin_unlock_bh(&queue->tx_ptr_lock);
+	spin_unlock_irqrestore(&queue->tx_ptr_lock, flags);
 
 	return ret;
 }
@@ -3030,6 +3030,7 @@ static int macb_close(struct net_device *dev)
 	for (q = 0, queue = bp->queues; q < bp->num_queues; ++q, ++queue) {
 		napi_disable(&queue->napi_rx);
 		napi_disable(&queue->napi_tx);
+		netdev_tx_reset_queue(netdev_get_tx_queue(dev, q));
 	}
 
 	phylink_stop(bp->phylink);
@@ -3080,7 +3081,7 @@ static void gem_update_stats(struct macb *bp)
 	unsigned int i, q, idx;
 	unsigned long *stat;
 
-	u32 *p = &bp->hw_stats.gem.tx_octets_31_0;
+	u64 *p = &bp->hw_stats.gem.tx_octets;
 
 	for (i = 0; i < GEM_STATS_LEN; ++i, ++p) {
 		u32 offset = gem_statistics[i].offset;
@@ -3093,7 +3094,7 @@ static void gem_update_stats(struct macb *bp)
 			/* Add GEM_OCTTXH, GEM_OCTRXH */
 			val = bp->macb_reg_readl(bp, offset + 4);
 			bp->ethtool_stats[i] += ((u64)val) << 32;
-			*(++p) += val;
+			*p += ((u64)val) << 32;
 		}
 	}
 
@@ -3103,16 +3104,13 @@ static void gem_update_stats(struct macb *bp)
 			bp->ethtool_stats[idx++] = *stat;
 }
 
-static struct net_device_stats *gem_get_stats(struct macb *bp)
+static void gem_get_stats(struct macb *bp, struct rtnl_link_stats64 *nstat)
 {
 	struct gem_stats *hwstat = &bp->hw_stats.gem;
-	struct net_device_stats *nstat = &bp->dev->stats;
-
-	if (!netif_running(bp->dev))
-		return nstat;
 
 	spin_lock_irq(&bp->stats_lock);
-	gem_update_stats(bp);
+	if (netif_running(bp->dev))
+		gem_update_stats(bp);
 
 	nstat->rx_errors = (hwstat->rx_frame_check_sequence_errors +
 			    hwstat->rx_alignment_errors +
@@ -3142,8 +3140,6 @@ static struct net_device_stats *gem_get_stats(struct macb *bp)
 	nstat->tx_carrier_errors = hwstat->tx_carrier_sense_errors;
 	nstat->tx_fifo_errors = hwstat->tx_underrun;
 	spin_unlock_irq(&bp->stats_lock);
-
-	return nstat;
 }
 
 static void gem_get_ethtool_stats(struct net_device *dev,
@@ -3195,14 +3191,17 @@ static void gem_get_ethtool_strings(struct net_device *dev, u32 sset, u8 *p)
 	}
 }
 
-static struct net_device_stats *macb_get_stats(struct net_device *dev)
+static void macb_get_stats(struct net_device *dev,
+			   struct rtnl_link_stats64 *nstat)
 {
 	struct macb *bp = netdev_priv(dev);
-	struct net_device_stats *nstat = &bp->dev->stats;
 	struct macb_stats *hwstat = &bp->hw_stats.macb;
 
-	if (macb_is_gem(bp))
-		return gem_get_stats(bp);
+	netdev_stats_to_stats64(nstat, &bp->dev->stats);
+	if (macb_is_gem(bp)) {
+		gem_get_stats(bp, nstat);
+		return;
+	}
 
 	/* read stats from hardware */
 	spin_lock_irq(&bp->stats_lock);
@@ -3240,8 +3239,170 @@ static struct net_device_stats *macb_get_stats(struct net_device *dev)
 	nstat->tx_fifo_errors = hwstat->tx_underruns;
 	/* Don't know about heartbeat or window errors... */
 	spin_unlock_irq(&bp->stats_lock);
+}
 
-	return nstat;
+static void macb_get_pause_stats(struct net_device *dev,
+				 struct ethtool_pause_stats *pause_stats)
+{
+	struct macb *bp = netdev_priv(dev);
+	struct macb_stats *hwstat = &bp->hw_stats.macb;
+
+	spin_lock_irq(&bp->stats_lock);
+	macb_update_stats(bp);
+	pause_stats->tx_pause_frames = hwstat->tx_pause_frames;
+	pause_stats->rx_pause_frames = hwstat->rx_pause_frames;
+	spin_unlock_irq(&bp->stats_lock);
+}
+
+static void gem_get_pause_stats(struct net_device *dev,
+				struct ethtool_pause_stats *pause_stats)
+{
+	struct macb *bp = netdev_priv(dev);
+	struct gem_stats *hwstat = &bp->hw_stats.gem;
+
+	spin_lock_irq(&bp->stats_lock);
+	gem_update_stats(bp);
+	pause_stats->tx_pause_frames = hwstat->tx_pause_frames;
+	pause_stats->rx_pause_frames = hwstat->rx_pause_frames;
+	spin_unlock_irq(&bp->stats_lock);
+}
+
+static void macb_get_eth_mac_stats(struct net_device *dev,
+				   struct ethtool_eth_mac_stats *mac_stats)
+{
+	struct macb *bp = netdev_priv(dev);
+	struct macb_stats *hwstat = &bp->hw_stats.macb;
+
+	spin_lock_irq(&bp->stats_lock);
+	macb_update_stats(bp);
+	mac_stats->FramesTransmittedOK = hwstat->tx_ok;
+	mac_stats->SingleCollisionFrames = hwstat->tx_single_cols;
+	mac_stats->MultipleCollisionFrames = hwstat->tx_multiple_cols;
+	mac_stats->FramesReceivedOK = hwstat->rx_ok;
+	mac_stats->FrameCheckSequenceErrors = hwstat->rx_fcs_errors;
+	mac_stats->AlignmentErrors = hwstat->rx_align_errors;
+	mac_stats->FramesWithDeferredXmissions = hwstat->tx_deferred;
+	mac_stats->LateCollisions = hwstat->tx_late_cols;
+	mac_stats->FramesAbortedDueToXSColls = hwstat->tx_excessive_cols;
+	mac_stats->FramesLostDueToIntMACXmitError = hwstat->tx_underruns;
+	mac_stats->CarrierSenseErrors = hwstat->tx_carrier_errors;
+	mac_stats->FramesLostDueToIntMACRcvError = hwstat->rx_overruns;
+	mac_stats->InRangeLengthErrors = hwstat->rx_length_mismatch;
+	mac_stats->FrameTooLongErrors = hwstat->rx_oversize_pkts;
+	spin_unlock_irq(&bp->stats_lock);
+}
+
+static void gem_get_eth_mac_stats(struct net_device *dev,
+				  struct ethtool_eth_mac_stats *mac_stats)
+{
+	struct macb *bp = netdev_priv(dev);
+	struct gem_stats *hwstat = &bp->hw_stats.gem;
+
+	spin_lock_irq(&bp->stats_lock);
+	gem_update_stats(bp);
+	mac_stats->FramesTransmittedOK = hwstat->tx_frames;
+	mac_stats->SingleCollisionFrames = hwstat->tx_single_collision_frames;
+	mac_stats->MultipleCollisionFrames =
+		hwstat->tx_multiple_collision_frames;
+	mac_stats->FramesReceivedOK = hwstat->rx_frames;
+	mac_stats->FrameCheckSequenceErrors =
+		hwstat->rx_frame_check_sequence_errors;
+	mac_stats->AlignmentErrors = hwstat->rx_alignment_errors;
+	mac_stats->OctetsTransmittedOK = hwstat->tx_octets;
+	mac_stats->FramesWithDeferredXmissions = hwstat->tx_deferred_frames;
+	mac_stats->LateCollisions = hwstat->tx_late_collisions;
+	mac_stats->FramesAbortedDueToXSColls = hwstat->tx_excessive_collisions;
+	mac_stats->FramesLostDueToIntMACXmitError = hwstat->tx_underrun;
+	mac_stats->CarrierSenseErrors = hwstat->tx_carrier_sense_errors;
+	mac_stats->OctetsReceivedOK = hwstat->rx_octets;
+	mac_stats->MulticastFramesXmittedOK = hwstat->tx_multicast_frames;
+	mac_stats->BroadcastFramesXmittedOK = hwstat->tx_broadcast_frames;
+	mac_stats->MulticastFramesReceivedOK = hwstat->rx_multicast_frames;
+	mac_stats->BroadcastFramesReceivedOK = hwstat->rx_broadcast_frames;
+	mac_stats->InRangeLengthErrors = hwstat->rx_length_field_frame_errors;
+	mac_stats->FrameTooLongErrors = hwstat->rx_oversize_frames;
+	spin_unlock_irq(&bp->stats_lock);
+}
+
+/* TODO: Report SQE test errors when added to phy_stats */
+static void macb_get_eth_phy_stats(struct net_device *dev,
+				   struct ethtool_eth_phy_stats *phy_stats)
+{
+	struct macb *bp = netdev_priv(dev);
+	struct macb_stats *hwstat = &bp->hw_stats.macb;
+
+	spin_lock_irq(&bp->stats_lock);
+	macb_update_stats(bp);
+	phy_stats->SymbolErrorDuringCarrier = hwstat->rx_symbol_errors;
+	spin_unlock_irq(&bp->stats_lock);
+}
+
+static void gem_get_eth_phy_stats(struct net_device *dev,
+				  struct ethtool_eth_phy_stats *phy_stats)
+{
+	struct macb *bp = netdev_priv(dev);
+	struct gem_stats *hwstat = &bp->hw_stats.gem;
+
+	spin_lock_irq(&bp->stats_lock);
+	gem_update_stats(bp);
+	phy_stats->SymbolErrorDuringCarrier = hwstat->rx_symbol_errors;
+	spin_unlock_irq(&bp->stats_lock);
+}
+
+static void macb_get_rmon_stats(struct net_device *dev,
+				struct ethtool_rmon_stats *rmon_stats,
+				const struct ethtool_rmon_hist_range **ranges)
+{
+	struct macb *bp = netdev_priv(dev);
+	struct macb_stats *hwstat = &bp->hw_stats.macb;
+
+	spin_lock_irq(&bp->stats_lock);
+	macb_update_stats(bp);
+	rmon_stats->undersize_pkts = hwstat->rx_undersize_pkts;
+	rmon_stats->oversize_pkts = hwstat->rx_oversize_pkts;
+	rmon_stats->jabbers = hwstat->rx_jabbers;
+	spin_unlock_irq(&bp->stats_lock);
+}
+
+static const struct ethtool_rmon_hist_range gem_rmon_ranges[] = {
+	{   64,    64 },
+	{   65,   127 },
+	{  128,   255 },
+	{  256,   511 },
+	{  512,  1023 },
+	{ 1024,  1518 },
+	{ 1519, 16384 },
+	{ },
+};
+
+static void gem_get_rmon_stats(struct net_device *dev,
+			       struct ethtool_rmon_stats *rmon_stats,
+			       const struct ethtool_rmon_hist_range **ranges)
+{
+	struct macb *bp = netdev_priv(dev);
+	struct gem_stats *hwstat = &bp->hw_stats.gem;
+
+	spin_lock_irq(&bp->stats_lock);
+	gem_update_stats(bp);
+	rmon_stats->undersize_pkts = hwstat->rx_undersized_frames;
+	rmon_stats->oversize_pkts = hwstat->rx_oversize_frames;
+	rmon_stats->jabbers = hwstat->rx_jabbers;
+	rmon_stats->hist[0] = hwstat->rx_64_byte_frames;
+	rmon_stats->hist[1] = hwstat->rx_65_127_byte_frames;
+	rmon_stats->hist[2] = hwstat->rx_128_255_byte_frames;
+	rmon_stats->hist[3] = hwstat->rx_256_511_byte_frames;
+	rmon_stats->hist[4] = hwstat->rx_512_1023_byte_frames;
+	rmon_stats->hist[5] = hwstat->rx_1024_1518_byte_frames;
+	rmon_stats->hist[6] = hwstat->rx_greater_than_1518_byte_frames;
+	rmon_stats->hist_tx[0] = hwstat->tx_64_byte_frames;
+	rmon_stats->hist_tx[1] = hwstat->tx_65_127_byte_frames;
+	rmon_stats->hist_tx[2] = hwstat->tx_128_255_byte_frames;
+	rmon_stats->hist_tx[3] = hwstat->tx_256_511_byte_frames;
+	rmon_stats->hist_tx[4] = hwstat->tx_512_1023_byte_frames;
+	rmon_stats->hist_tx[5] = hwstat->tx_1024_1518_byte_frames;
+	rmon_stats->hist_tx[6] = hwstat->tx_greater_than_1518_byte_frames;
+	spin_unlock_irq(&bp->stats_lock);
+	*ranges = gem_rmon_ranges;
 }
 
 static int macb_get_regs_len(struct net_device *netdev)
@@ -3770,6 +3931,10 @@ static const struct ethtool_ops macb_ethtool_ops = {
 	.get_regs		= macb_get_regs,
 	.get_link		= ethtool_op_get_link,
 	.get_ts_info		= ethtool_op_get_ts_info,
+	.get_pause_stats	= macb_get_pause_stats,
+	.get_eth_mac_stats	= macb_get_eth_mac_stats,
+	.get_eth_phy_stats	= macb_get_eth_phy_stats,
+	.get_rmon_stats		= macb_get_rmon_stats,
 	.get_wol		= macb_get_wol,
 	.set_wol		= macb_set_wol,
 	.get_link_ksettings     = macb_get_link_ksettings,
@@ -3788,6 +3953,10 @@ static const struct ethtool_ops gem_ethtool_ops = {
 	.get_ethtool_stats	= gem_get_ethtool_stats,
 	.get_strings		= gem_get_ethtool_strings,
 	.get_sset_count		= gem_get_sset_count,
+	.get_pause_stats	= gem_get_pause_stats,
+	.get_eth_mac_stats	= gem_get_eth_mac_stats,
+	.get_eth_phy_stats	= gem_get_eth_phy_stats,
+	.get_rmon_stats		= gem_get_rmon_stats,
 	.get_link_ksettings     = macb_get_link_ksettings,
 	.set_link_ksettings     = macb_set_link_ksettings,
 	.get_ringparam		= macb_get_ringparam,
@@ -3924,7 +4093,7 @@ static const struct net_device_ops macb_netdev_ops = {
 	.ndo_stop		= macb_close,
 	.ndo_start_xmit		= macb_start_xmit,
 	.ndo_set_rx_mode	= macb_set_rx_mode,
-	.ndo_get_stats		= macb_get_stats,
+	.ndo_get_stats64	= macb_get_stats,
 	.ndo_eth_ioctl		= macb_ioctl,
 	.ndo_validate_addr	= eth_validate_addr,
 	.ndo_change_mtu		= macb_change_mtu,
@@ -4585,7 +4754,7 @@ static const struct net_device_ops at91ether_netdev_ops = {
 	.ndo_open		= at91ether_open,
 	.ndo_stop		= at91ether_close,
 	.ndo_start_xmit		= at91ether_start_xmit,
-	.ndo_get_stats		= macb_get_stats,
+	.ndo_get_stats64	= macb_get_stats,
 	.ndo_set_rx_mode	= macb_set_rx_mode,
 	.ndo_set_mac_address	= eth_mac_addr,
 	.ndo_eth_ioctl		= macb_ioctl,
@@ -4849,10 +5018,11 @@ static const struct macb_config pc302gem_config = {
 };
 
 static const struct macb_config sama5d2_config = {
-	.caps = MACB_CAPS_USRIO_DEFAULT_IS_MII_GMII,
+	.caps = MACB_CAPS_USRIO_DEFAULT_IS_MII_GMII | MACB_CAPS_JUMBO,
 	.dma_burst_length = 16,
 	.clk_init = macb_clk_init,
 	.init = macb_init,
+	.jumbo_max_len = 10240,
 	.usrio = &macb_default_usrio,
 };
 
@@ -5225,19 +5395,16 @@ static void macb_remove(struct platform_device *pdev)
 
 	if (dev) {
 		bp = netdev_priv(dev);
+		unregister_netdev(dev);
 		phy_exit(bp->sgmii_phy);
 		mdiobus_unregister(bp->mii_bus);
 		mdiobus_free(bp->mii_bus);
 
-		unregister_netdev(dev);
+		device_set_wakeup_enable(&bp->pdev->dev, 0);
 		cancel_work_sync(&bp->hresp_err_bh_work);
 		pm_runtime_disable(&pdev->dev);
 		pm_runtime_dont_use_autosuspend(&pdev->dev);
-		if (!pm_runtime_suspended(&pdev->dev)) {
-			macb_clks_disable(bp->pclk, bp->hclk, bp->tx_clk,
-					  bp->rx_clk, bp->tsu_clk);
-			pm_runtime_set_suspended(&pdev->dev);
-		}
+		pm_runtime_set_suspended(&pdev->dev);
 		phylink_destroy(bp->phylink);
 		free_netdev(dev);
 	}
@@ -5495,7 +5662,7 @@ static const struct dev_pm_ops macb_pm_ops = {
 
 static struct platform_driver macb_driver = {
 	.probe		= macb_probe,
-	.remove_new	= macb_remove,
+	.remove		= macb_remove,
 	.driver		= {
 		.name		= "macb",
 		.of_match_table	= of_match_ptr(macb_dt_ids),

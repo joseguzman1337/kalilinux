@@ -13,6 +13,7 @@
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_address.h>
+#include <linux/of_reserved_mem.h>
 #include <linux/dma-mapping.h>
 #include <linux/pm_runtime.h>
 #include <sound/soc.h>
@@ -1070,6 +1071,12 @@ static int mt8173_afe_pcm_dev_probe(struct platform_device *pdev)
 
 	afe->dev = &pdev->dev;
 
+	ret = of_reserved_mem_device_init(&pdev->dev);
+	if (ret) {
+		dev_info(&pdev->dev, "no reserved memory found, pre-allocating buffers instead\n");
+		afe->preallocate_buffers = true;
+	}
+
 	irq_id = platform_get_irq(pdev, 0);
 	if (irq_id <= 0)
 		return irq_id < 0 ? irq_id : -ENXIO;
@@ -1212,15 +1219,15 @@ static const struct of_device_id mt8173_afe_pcm_dt_match[] = {
 MODULE_DEVICE_TABLE(of, mt8173_afe_pcm_dt_match);
 
 static const struct dev_pm_ops mt8173_afe_pm_ops = {
-	SET_RUNTIME_PM_OPS(mt8173_afe_runtime_suspend,
-			   mt8173_afe_runtime_resume, NULL)
+	RUNTIME_PM_OPS(mt8173_afe_runtime_suspend,
+		       mt8173_afe_runtime_resume, NULL)
 };
 
 static struct platform_driver mt8173_afe_pcm_driver = {
 	.driver = {
 		   .name = "mt8173-afe-pcm",
 		   .of_match_table = mt8173_afe_pcm_dt_match,
-		   .pm = &mt8173_afe_pm_ops,
+		   .pm = pm_ptr(&mt8173_afe_pm_ops),
 	},
 	.probe = mt8173_afe_pcm_dev_probe,
 	.remove = mt8173_afe_pcm_dev_remove,

@@ -453,6 +453,17 @@ static int module_init_ftrace_plt(const Elf_Ehdr *hdr,
 	__init_plt(&plts[FTRACE_PLT_IDX], FTRACE_ADDR);
 
 	mod->arch.ftrace_trampolines = plts;
+
+	s = find_section(hdr, sechdrs, ".init.text.ftrace_trampoline");
+	if (!s)
+		return -ENOEXEC;
+
+	plts = (void *)s->sh_addr;
+
+	__init_plt(&plts[FTRACE_PLT_IDX], FTRACE_ADDR);
+
+	mod->arch.init_ftrace_trampolines = plts;
+
 #endif
 	return 0;
 }
@@ -462,14 +473,20 @@ int module_finalize(const Elf_Ehdr *hdr,
 		    struct module *me)
 {
 	const Elf_Shdr *s;
+	int ret;
+
 	s = find_section(hdr, sechdrs, ".altinstructions");
 	if (s)
 		apply_alternatives_module((void *)s->sh_addr, s->sh_size);
 
 	if (scs_is_dynamic()) {
 		s = find_section(hdr, sechdrs, ".init.eh_frame");
-		if (s)
-			__pi_scs_patch((void *)s->sh_addr, s->sh_size);
+		if (s) {
+			ret = __pi_scs_patch((void *)s->sh_addr, s->sh_size);
+			if (ret)
+				pr_err("module %s: error occurred during dynamic SCS patching (%d)\n",
+				       me->name, ret);
+		}
 	}
 
 	return module_init_ftrace_plt(hdr, sechdrs, me);

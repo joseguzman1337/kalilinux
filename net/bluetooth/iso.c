@@ -336,7 +336,7 @@ static int iso_connect_bis(struct sock *sk)
 	struct hci_dev  *hdev;
 	int err;
 
-	BT_DBG("%pMR", &iso_pi(sk)->src);
+	BT_DBG("%pMR (SID 0x%2.2x)", &iso_pi(sk)->src, iso_pi(sk)->bc_sid);
 
 	hdev = hci_get_route(&iso_pi(sk)->dst, &iso_pi(sk)->src,
 			     iso_pi(sk)->src_type);
@@ -365,7 +365,7 @@ static int iso_connect_bis(struct sock *sk)
 
 	/* Just bind if DEFER_SETUP has been set */
 	if (test_bit(BT_SK_DEFER_SETUP, &bt_sk(sk)->flags)) {
-		hcon = hci_bind_bis(hdev, &iso_pi(sk)->dst,
+		hcon = hci_bind_bis(hdev, &iso_pi(sk)->dst, iso_pi(sk)->bc_sid,
 				    &iso_pi(sk)->qos, iso_pi(sk)->base_len,
 				    iso_pi(sk)->base);
 		if (IS_ERR(hcon)) {
@@ -375,12 +375,16 @@ static int iso_connect_bis(struct sock *sk)
 	} else {
 		hcon = hci_connect_bis(hdev, &iso_pi(sk)->dst,
 				       le_addr_type(iso_pi(sk)->dst_type),
-				       &iso_pi(sk)->qos, iso_pi(sk)->base_len,
-				       iso_pi(sk)->base);
+				       iso_pi(sk)->bc_sid, &iso_pi(sk)->qos,
+				       iso_pi(sk)->base_len, iso_pi(sk)->base);
 		if (IS_ERR(hcon)) {
 			err = PTR_ERR(hcon);
 			goto unlock;
 		}
+
+		/* Update SID if it was not set */
+		if (iso_pi(sk)->bc_sid == HCI_SID_INVALID)
+			iso_pi(sk)->bc_sid = hcon->sid;
 	}
 
 	conn = iso_conn_add(hcon);
@@ -518,7 +522,8 @@ static struct bt_iso_qos *iso_sock_get_qos(struct sock *sk)
 	return &iso_pi(sk)->qos;
 }
 
-static int iso_send_frame(struct sock *sk, struct sk_buff *skb)
+static int iso_send_frame(struct sock *sk, struct sk_buff *skb,
+			  const struct sockcm_cookie *sockc)
 {
 	struct iso_conn *conn = iso_pi(sk)->conn;
 	struct bt_iso_qos *qos = iso_sock_get_qos(sk);
@@ -538,10 +543,12 @@ static int iso_send_frame(struct sock *sk, struct sk_buff *skb)
 	hdr->slen = cpu_to_le16(hci_iso_data_len_pack(len,
 						      HCI_ISO_STATUS_VALID));
 
-	if (sk->sk_state == BT_CONNECTED)
+	if (sk->sk_state == BT_CONNECTED) {
+		hci_setup_tx_timestamp(skb, 1, sockc);
 		hci_send_iso(conn->hcon, skb);
-	else
+	} else {
 		len = -ENOTCONN;
+	}
 
 	return len;
 }
@@ -1281,6 +1288,42 @@ static int iso_sock_accept(struct socket *sock, struct socket *newsock,
 
 	BT_DBG("new socket %p", ch);
 
+	/* A Broadcast Sink might require BIG sync to be terminated
+	 * and re-established multiple times, while keeping the same
+	 * PA sync handle active. To allow this, once all BIS
+	 * connections have been accepted on a PA sync parent socket,
+	 * "reset" socket state, to allow future BIG re-sync procedures.
+	 */
+	if (test_bit(BT_SK_PA_SYNC, &iso_pi(sk)->flags)) {
+		/* Iterate through the list of bound BIS indices
+		 * and clear each BIS as they are accepted by the
+		 * user space, one by one.
+		 */
+		for (int i = 0; i < iso_pi(sk)->bc_num_bis; i++) {
+			if (iso_pi(sk)->bc_bis[i] > 0) {
+				iso_pi(sk)->bc_bis[i] = 0;
+				iso_pi(sk)->bc_num_bis--;
+				break;
+			}
+		}
+
+		if (iso_pi(sk)->bc_num_bis == 0) {
+			/* Once the last BIS was accepted, reset parent
+			 * socket parameters to mark that the listening
+			 * process for BIS connections has been completed:
+			 *
+			 * 1. Reset the DEFER setup flag on the parent sk.
+			 * 2. Clear the flag marking that the BIG create
+			 *    sync command is pending.
+			 * 3. Transition socket state from BT_LISTEN to
+			 *    BT_CONNECTED.
+			 */
+			set_bit(BT_SK_DEFER_SETUP, &bt_sk(sk)->flags);
+			clear_bit(BT_SK_BIG_SYNC, &iso_pi(sk)->flags);
+			sk->sk_state = BT_CONNECTED;
+		}
+	}
+
 done:
 	release_sock(sk);
 	return err;
@@ -1291,20 +1334,32 @@ static int iso_sock_getname(struct socket *sock, struct sockaddr *addr,
 {
 	struct sockaddr_iso *sa = (struct sockaddr_iso *)addr;
 	struct sock *sk = sock->sk;
+	int len = sizeof(struct sockaddr_iso);
 
 	BT_DBG("sock %p, sk %p", sock, sk);
 
 	addr->sa_family = AF_BLUETOOTH;
 
 	if (peer) {
+		struct hci_conn *hcon = iso_pi(sk)->conn ?
+					iso_pi(sk)->conn->hcon : NULL;
+
 		bacpy(&sa->iso_bdaddr, &iso_pi(sk)->dst);
 		sa->iso_bdaddr_type = iso_pi(sk)->dst_type;
+
+		if (hcon && (hcon->type == BIS_LINK || hcon->type == PA_LINK)) {
+			sa->iso_bc->bc_sid = iso_pi(sk)->bc_sid;
+			sa->iso_bc->bc_num_bis = iso_pi(sk)->bc_num_bis;
+			memcpy(sa->iso_bc->bc_bis, iso_pi(sk)->bc_bis,
+			       ISO_MAX_NUM_BIS);
+			len += sizeof(struct sockaddr_iso_bc);
+		}
 	} else {
 		bacpy(&sa->iso_bdaddr, &iso_pi(sk)->src);
 		sa->iso_bdaddr_type = iso_pi(sk)->src_type;
 	}
 
-	return sizeof(struct sockaddr_iso);
+	return len;
 }
 
 static int iso_sock_sendmsg(struct socket *sock, struct msghdr *msg,
@@ -1312,6 +1367,7 @@ static int iso_sock_sendmsg(struct socket *sock, struct msghdr *msg,
 {
 	struct sock *sk = sock->sk;
 	struct sk_buff *skb, **frag;
+	struct sockcm_cookie sockc;
 	size_t mtu;
 	int err;
 
@@ -1323,6 +1379,14 @@ static int iso_sock_sendmsg(struct socket *sock, struct msghdr *msg,
 
 	if (msg->msg_flags & MSG_OOB)
 		return -EOPNOTSUPP;
+
+	hci_sockcm_init(&sockc, sk);
+
+	if (msg->msg_controllen) {
+		err = sock_cmsg_send(sk, msg, &sockc);
+		if (err)
+			return err;
+	}
 
 	lock_sock(sk);
 
@@ -1369,7 +1433,7 @@ static int iso_sock_sendmsg(struct socket *sock, struct msghdr *msg,
 	lock_sock(sk);
 
 	if (sk->sk_state == BT_CONNECTED)
-		err = iso_send_frame(sk, skb);
+		err = iso_send_frame(sk, skb, &sockc);
 	else
 		err = -ENOTCONN;
 
@@ -1436,6 +1500,10 @@ static int iso_sock_recvmsg(struct socket *sock, struct msghdr *msg,
 	int err = 0;
 
 	BT_DBG("sk %p", sk);
+
+	if (unlikely(flags & MSG_ERRQUEUE))
+		return sock_recv_errqueue(sk, msg, len, SOL_BLUETOOTH,
+					  BT_SCM_ERROR);
 
 	if (test_and_clear_bit(BT_SK_DEFER_SETUP, &bt_sk(sk)->flags)) {
 		sock_hold(sk);
@@ -1828,6 +1896,13 @@ static bool iso_match_big(struct sock *sk, void *data)
 	return ev->handle == iso_pi(sk)->qos.bcast.big;
 }
 
+static bool iso_match_big_hcon(struct sock *sk, void *data)
+{
+	struct hci_conn *hcon = data;
+
+	return hcon->iso_qos.bcast.big == iso_pi(sk)->qos.bcast.big;
+}
+
 static bool iso_match_pa_sync_flag(struct sock *sk, void *data)
 {
 	return test_bit(BT_SK_PA_SYNC, &iso_pi(sk)->flags);
@@ -1851,8 +1926,16 @@ static void iso_conn_ready(struct iso_conn *conn)
 		if (!hcon)
 			return;
 
-		if (test_bit(HCI_CONN_BIG_SYNC, &hcon->flags) ||
-		    test_bit(HCI_CONN_BIG_SYNC_FAILED, &hcon->flags)) {
+		if (test_bit(HCI_CONN_BIG_SYNC, &hcon->flags)) {
+			/* A BIS slave hcon is notified to the ISO layer
+			 * after the Command Complete for the LE Setup
+			 * ISO Data Path command is received. Get the
+			 * parent socket that matches the hcon BIG handle.
+			 */
+			parent = iso_get_sock(&hcon->src, &hcon->dst,
+					      BT_LISTEN, iso_match_big_hcon,
+					      hcon);
+		} else if (test_bit(HCI_CONN_BIG_SYNC_FAILED, &hcon->flags)) {
 			ev = hci_recv_event_data(hcon->hdev,
 						 HCI_EVT_LE_BIG_SYNC_ESTABLISHED);
 
@@ -1919,14 +2002,15 @@ static void iso_conn_ready(struct iso_conn *conn)
 		if (!bacmp(&hcon->dst, BDADDR_ANY)) {
 			bacpy(&hcon->dst, &iso_pi(parent)->dst);
 			hcon->dst_type = iso_pi(parent)->dst_type;
-			hcon->sync_handle = iso_pi(parent)->sync_handle;
 		}
 
-		if (ev3) {
+		if (test_bit(HCI_CONN_PA_SYNC, &hcon->flags)) {
 			iso_pi(sk)->qos = iso_pi(parent)->qos;
 			hcon->iso_qos = iso_pi(sk)->qos;
+			iso_pi(sk)->bc_sid = iso_pi(parent)->bc_sid;
 			iso_pi(sk)->bc_num_bis = iso_pi(parent)->bc_num_bis;
-			memcpy(iso_pi(sk)->bc_bis, iso_pi(parent)->bc_bis, ISO_MAX_NUM_BIS);
+			memcpy(iso_pi(sk)->bc_bis, iso_pi(parent)->bc_bis,
+			       ISO_MAX_NUM_BIS);
 			set_bit(BT_SK_PA_SYNC, &iso_pi(sk)->flags);
 		}
 
@@ -2142,7 +2226,8 @@ done:
 
 static void iso_connect_cfm(struct hci_conn *hcon, __u8 status)
 {
-	if (hcon->type != ISO_LINK) {
+	if (hcon->type != CIS_LINK && hcon->type != BIS_LINK &&
+	    hcon->type != PA_LINK) {
 		if (hcon->type != LE_LINK)
 			return;
 
@@ -2183,7 +2268,8 @@ static void iso_connect_cfm(struct hci_conn *hcon, __u8 status)
 
 static void iso_disconn_cfm(struct hci_conn *hcon, __u8 reason)
 {
-	if (hcon->type != ISO_LINK)
+	if (hcon->type != CIS_LINK && hcon->type !=  BIS_LINK &&
+	    hcon->type != PA_LINK)
 		return;
 
 	BT_DBG("hcon %p reason %d", hcon, reason);
@@ -2371,11 +2457,11 @@ static const struct net_proto_family iso_sock_family_ops = {
 	.create	= iso_sock_create,
 };
 
-static bool iso_inited;
+static bool inited;
 
-bool iso_enabled(void)
+bool iso_inited(void)
 {
-	return iso_inited;
+	return inited;
 }
 
 int iso_init(void)
@@ -2384,7 +2470,7 @@ int iso_init(void)
 
 	BUILD_BUG_ON(sizeof(struct sockaddr_iso) > sizeof(struct sockaddr));
 
-	if (iso_inited)
+	if (inited)
 		return -EALREADY;
 
 	err = proto_register(&iso_proto, 0);
@@ -2412,7 +2498,7 @@ int iso_init(void)
 		iso_debugfs = debugfs_create_file("iso", 0444, bt_debugfs,
 						  NULL, &iso_debugfs_fops);
 
-	iso_inited = true;
+	inited = true;
 
 	return 0;
 
@@ -2423,7 +2509,7 @@ error:
 
 int iso_exit(void)
 {
-	if (!iso_inited)
+	if (!inited)
 		return -EALREADY;
 
 	bt_procfs_cleanup(&init_net, "iso");
@@ -2437,7 +2523,7 @@ int iso_exit(void)
 
 	proto_unregister(&iso_proto);
 
-	iso_inited = false;
+	inited = false;
 
 	return 0;
 }

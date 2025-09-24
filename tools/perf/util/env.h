@@ -56,8 +56,6 @@ struct pmu_caps {
 
 typedef const char *(arch_syscalls__strerrno_t)(int err);
 
-arch_syscalls__strerrno_t *arch_syscalls__strerrno_function(const char *arch);
-
 struct perf_env {
 	char			*hostname;
 	char			*os_release;
@@ -195,4 +193,8 @@ bool perf_env__has_pmu_mapping(struct perf_env *env, const char *pmu_name);
 void perf_env__find_br_cntr_info(struct perf_env *env,
 				 unsigned int *nr,
 				 unsigned int *width);
+
+bool x86__is_amd_cpu(void);
+bool perf_env__is_x86_amd_cpu(struct perf_env *env);
+
 #endif /* __PERF_ENV_H */

@@ -635,7 +635,7 @@ static int kvaser_pciefd_bus_on(struct kvaser_pciefd_can *can)
 	u32 mode;
 	unsigned long irq;
 
-	del_timer(&can->bec_poll_timer);
+	timer_delete(&can->bec_poll_timer);
 	if (!completion_done(&can->flush_comp))
 		kvaser_pciefd_start_controller_flush(can);
 
@@ -749,7 +749,7 @@ static int kvaser_pciefd_stop(struct net_device *netdev)
 		ret = -ETIMEDOUT;
 	} else {
 		iowrite32(0, can->reg_base + KVASER_PCIEFD_KCAN_IEN_REG);
-		del_timer(&can->bec_poll_timer);
+		timer_delete(&can->bec_poll_timer);
 	}
 	can->can.state = CAN_STATE_STOPPED;
 	netdev_reset_queue(netdev);
@@ -863,7 +863,7 @@ static int kvaser_pciefd_set_bittiming(struct kvaser_pciefd_can *can, bool data)
 	struct can_bittiming *bt;
 
 	if (data)
-		bt = &can->can.data_bittiming;
+		bt = &can->can.fd.data_bittiming;
 	else
 		bt = &can->can.bittiming;
 
@@ -937,7 +937,8 @@ static int kvaser_pciefd_get_berr_counter(const struct net_device *ndev,
 
 static void kvaser_pciefd_bec_poll_timer(struct timer_list *data)
 {
-	struct kvaser_pciefd_can *can = from_timer(can, data, bec_poll_timer);
+	struct kvaser_pciefd_can *can = timer_container_of(can, data,
+							   bec_poll_timer);
 
 	kvaser_pciefd_enable_err_gen(can);
 	kvaser_pciefd_request_status(can);
@@ -981,6 +982,7 @@ static int kvaser_pciefd_setup_can_ctrls(struct kvaser_pciefd *pcie)
 		can->completed_tx_bytes = 0;
 		can->bec.txerr = 0;
 		can->bec.rxerr = 0;
+		can->can.dev->dev_port = i;
 
 		init_completion(&can->start_comp);
 		init_completion(&can->flush_comp);
@@ -998,15 +1000,16 @@ static int kvaser_pciefd_setup_can_ctrls(struct kvaser_pciefd *pcie)
 		spin_lock_init(&can->lock);
 
 		can->can.bittiming_const = &kvaser_pciefd_bittiming_const;
-		can->can.data_bittiming_const = &kvaser_pciefd_bittiming_const;
+		can->can.fd.data_bittiming_const = &kvaser_pciefd_bittiming_const;
 		can->can.do_set_bittiming = kvaser_pciefd_set_nominal_bittiming;
-		can->can.do_set_data_bittiming = kvaser_pciefd_set_data_bittiming;
+		can->can.fd.do_set_data_bittiming = kvaser_pciefd_set_data_bittiming;
 		can->can.do_set_mode = kvaser_pciefd_set_mode;
 		can->can.do_get_berr_counter = kvaser_pciefd_get_berr_counter;
 		can->can.ctrlmode_supported = CAN_CTRLMODE_LISTENONLY |
 					      CAN_CTRLMODE_FD |
 					      CAN_CTRLMODE_FD_NON_ISO |
-					      CAN_CTRLMODE_CC_LEN8_DLC;
+					      CAN_CTRLMODE_CC_LEN8_DLC |
+					      CAN_CTRLMODE_BERR_REPORTING;
 
 		status = ioread32(can->reg_base + KVASER_PCIEFD_KCAN_STAT_REG);
 		if (!(status & KVASER_PCIEFD_KCAN_STAT_FD)) {
@@ -1243,11 +1246,15 @@ static int kvaser_pciefd_handle_data_packet(struct kvaser_pciefd *pcie,
 }
 
 static void kvaser_pciefd_change_state(struct kvaser_pciefd_can *can,
+				       const struct can_berr_counter *bec,
 				       struct can_frame *cf,
 				       enum can_state new_state,
 				       enum can_state tx_state,
 				       enum can_state rx_state)
 {
+	enum can_state old_state;
+
+	old_state = can->can.state;
 	can_change_state(can->can.dev, cf, tx_state, rx_state);
 
 	if (new_state == CAN_STATE_BUS_OFF) {
@@ -1262,6 +1269,18 @@ static void kvaser_pciefd_change_state(struct kvaser_pciefd_can *can,
 			kvaser_pciefd_start_controller_flush(can);
 			can_bus_off(ndev);
 		}
+	}
+	if (old_state == CAN_STATE_BUS_OFF &&
+	    new_state == CAN_STATE_ERROR_ACTIVE &&
+	    can->can.restart_ms) {
+		can->can.can_stats.restarts++;
+		if (cf)
+			cf->can_id |= CAN_ERR_RESTARTED;
+	}
+	if (cf && new_state != CAN_STATE_BUS_OFF) {
+		cf->can_id |= CAN_ERR_CNT;
+		cf->data[6] = bec->txerr;
+		cf->data[7] = bec->rxerr;
 	}
 }
 
@@ -1297,7 +1316,7 @@ static int kvaser_pciefd_rx_error_frame(struct kvaser_pciefd_can *can,
 	struct can_berr_counter bec;
 	enum can_state old_state, new_state, tx_state, rx_state;
 	struct net_device *ndev = can->can.dev;
-	struct sk_buff *skb;
+	struct sk_buff *skb = NULL;
 	struct can_frame *cf = NULL;
 
 	old_state = can->can.state;
@@ -1306,16 +1325,10 @@ static int kvaser_pciefd_rx_error_frame(struct kvaser_pciefd_can *can,
 	bec.rxerr = FIELD_GET(KVASER_PCIEFD_SPACK_RXERR_MASK, p->header[0]);
 
 	kvaser_pciefd_packet_to_state(p, &bec, &new_state, &tx_state, &rx_state);
-	skb = alloc_can_err_skb(ndev, &cf);
+	if (can->can.ctrlmode & CAN_CTRLMODE_BERR_REPORTING)
+		skb = alloc_can_err_skb(ndev, &cf);
 	if (new_state != old_state) {
-		kvaser_pciefd_change_state(can, cf, new_state, tx_state, rx_state);
-		if (old_state == CAN_STATE_BUS_OFF &&
-		    new_state == CAN_STATE_ERROR_ACTIVE &&
-		    can->can.restart_ms) {
-			can->can.can_stats.restarts++;
-			if (skb)
-				cf->can_id |= CAN_ERR_RESTARTED;
-		}
+		kvaser_pciefd_change_state(can, &bec, cf, new_state, tx_state, rx_state);
 	}
 
 	can->err_rep_cnt++;
@@ -1328,17 +1341,18 @@ static int kvaser_pciefd_rx_error_frame(struct kvaser_pciefd_can *can,
 	can->bec.txerr = bec.txerr;
 	can->bec.rxerr = bec.rxerr;
 
-	if (!skb) {
-		ndev->stats.rx_dropped++;
-		return -ENOMEM;
+	if (can->can.ctrlmode & CAN_CTRLMODE_BERR_REPORTING) {
+		if (!skb) {
+			netdev_warn(ndev, "No memory left for err_skb\n");
+			ndev->stats.rx_dropped++;
+			return -ENOMEM;
+		}
+		kvaser_pciefd_set_skb_timestamp(can->kv_pcie, skb, p->timestamp);
+		cf->can_id |= CAN_ERR_BUSERROR | CAN_ERR_CNT;
+		cf->data[6] = bec.txerr;
+		cf->data[7] = bec.rxerr;
+		netif_rx(skb);
 	}
-
-	kvaser_pciefd_set_skb_timestamp(can->kv_pcie, skb, p->timestamp);
-	cf->can_id |= CAN_ERR_BUSERROR | CAN_ERR_CNT;
-	cf->data[6] = bec.txerr;
-	cf->data[7] = bec.rxerr;
-
-	netif_rx(skb);
 
 	return 0;
 }
@@ -1368,6 +1382,7 @@ static int kvaser_pciefd_handle_status_resp(struct kvaser_pciefd_can *can,
 {
 	struct can_berr_counter bec;
 	enum can_state old_state, new_state, tx_state, rx_state;
+	int ret = 0;
 
 	old_state = can->can.state;
 
@@ -1381,25 +1396,15 @@ static int kvaser_pciefd_handle_status_resp(struct kvaser_pciefd_can *can,
 		struct can_frame *cf;
 
 		skb = alloc_can_err_skb(ndev, &cf);
-		if (!skb) {
+		kvaser_pciefd_change_state(can, &bec, cf, new_state, tx_state, rx_state);
+		if (skb) {
+			kvaser_pciefd_set_skb_timestamp(can->kv_pcie, skb, p->timestamp);
+			netif_rx(skb);
+		} else {
 			ndev->stats.rx_dropped++;
-			return -ENOMEM;
+			netdev_warn(ndev, "No memory left for err_skb\n");
+			ret = -ENOMEM;
 		}
-
-		kvaser_pciefd_change_state(can, cf, new_state, tx_state, rx_state);
-		if (old_state == CAN_STATE_BUS_OFF &&
-		    new_state == CAN_STATE_ERROR_ACTIVE &&
-		    can->can.restart_ms) {
-			can->can.can_stats.restarts++;
-			cf->can_id |= CAN_ERR_RESTARTED;
-		}
-
-		kvaser_pciefd_set_skb_timestamp(can->kv_pcie, skb, p->timestamp);
-
-		cf->data[6] = bec.txerr;
-		cf->data[7] = bec.rxerr;
-
-		netif_rx(skb);
 	}
 	can->bec.txerr = bec.txerr;
 	can->bec.rxerr = bec.rxerr;
@@ -1407,7 +1412,7 @@ static int kvaser_pciefd_handle_status_resp(struct kvaser_pciefd_can *can,
 	if (bec.txerr || bec.rxerr)
 		mod_timer(&can->bec_poll_timer, KVASER_PCIEFD_BEC_POLL_FREQ);
 
-	return 0;
+	return ret;
 }
 
 static int kvaser_pciefd_handle_status_packet(struct kvaser_pciefd *pcie,
@@ -1880,7 +1885,7 @@ static void kvaser_pciefd_remove(struct pci_dev *pdev)
 		struct kvaser_pciefd_can *can = pcie->can[i];
 
 		unregister_candev(can->can.dev);
-		del_timer(&can->bec_poll_timer);
+		timer_delete(&can->bec_poll_timer);
 		kvaser_pciefd_pwm_stop(can);
 	}
 

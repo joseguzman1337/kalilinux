@@ -97,6 +97,7 @@
 #define ATH12K_REGDB_FILE_NAME		"regdb.bin"
 
 #define ATH12K_PCIE_MAX_PAYLOAD_SIZE	128
+#define ATH12K_IPQ5332_USERPD_ID	1
 
 enum ath12k_hw_rate_cck {
 	ATH12K_HW_RATE_CCK_LP_11M = 0,
@@ -121,6 +122,7 @@ enum ath12k_hw_rate_ofdm {
 
 enum ath12k_bus {
 	ATH12K_BUS_PCI,
+	ATH12K_BUS_AHB,
 };
 
 #define ATH12K_EXT_IRQ_GRP_NUM_MAX 11
@@ -133,6 +135,7 @@ enum hal_encrypt_type;
 struct ath12k_hw_ring_mask {
 	u8 tx[ATH12K_EXT_IRQ_GRP_NUM_MAX];
 	u8 rx_mon_dest[ATH12K_EXT_IRQ_GRP_NUM_MAX];
+	u8 rx_mon_status[ATH12K_EXT_IRQ_GRP_NUM_MAX];
 	u8 rx[ATH12K_EXT_IRQ_GRP_NUM_MAX];
 	u8 rx_err[ATH12K_EXT_IRQ_GRP_NUM_MAX];
 	u8 rx_wbm_rel[ATH12K_EXT_IRQ_GRP_NUM_MAX];
@@ -146,6 +149,11 @@ struct ath12k_hw_hal_params {
 	u32	  wbm2sw_cc_enable;
 };
 
+enum ath12k_m3_fw_loaders {
+	ath12k_m3_fw_loader_driver,
+	ath12k_m3_fw_loader_remoteproc,
+};
+
 struct ath12k_hw_params {
 	const char *name;
 	u16 hw_rev;
@@ -154,6 +162,7 @@ struct ath12k_hw_params {
 		const char *dir;
 		size_t board_size;
 		size_t cal_offset;
+		enum ath12k_m3_fw_loaders m3_loader;
 	} fw;
 
 	u8 max_radios;
@@ -190,6 +199,7 @@ struct ath12k_hw_params {
 	bool reoq_lut_support:1;
 	bool supports_shadow_regs:1;
 	bool supports_aspm:1;
+	bool current_cc_support:1;
 
 	u32 num_tcl_banks;
 	u32 max_tx_ring;
@@ -220,6 +230,13 @@ struct ath12k_hw_params {
 	bool supports_dynamic_smps_6ghz;
 
 	u32 iova_mask;
+
+	const struct ce_ie_addr *ce_ie_addr;
+	const struct ce_remap *ce_remap;
+	u32 bdf_addr_offset;
+
+	/* setup REO queue, frag etc only for primary link peer */
+	bool dp_primary_link_only:1;
 };
 
 struct ath12k_hw_ops {
@@ -229,6 +246,8 @@ struct ath12k_hw_ops {
 	int (*rxdma_ring_sel_config)(struct ath12k_base *ab);
 	u8 (*get_ring_selector)(struct sk_buff *skb);
 	bool (*dp_srng_is_tx_comp_ring)(int ring_num);
+	bool (*is_frame_link_agnostic)(struct ath12k_link_vif *arvif,
+				       struct ieee80211_mgmt *mgmt);
 };
 
 static inline
@@ -298,6 +317,9 @@ struct ath12k_hw_regs {
 	u32 hal_tcl2_ring_base_lsb;
 
 	u32 hal_tcl_status_ring_base_lsb;
+
+	u32 hal_reo1_qdesc_addr;
+	u32 hal_reo1_qdesc_max_peerid;
 
 	u32 hal_wbm_idle_ring_base_lsb;
 	u32 hal_wbm_idle_ring_misc_addr;

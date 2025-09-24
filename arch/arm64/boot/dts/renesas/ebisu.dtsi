@@ -392,15 +392,13 @@
 		reg = <0x20>;
 		gpio-controller;
 		#gpio-cells = <2>;
-		interrupt-parent = <&gpio2>;
-		interrupts = <22 IRQ_TYPE_LEVEL_LOW>;
+		interrupts-extended = <&gpio2 22 IRQ_TYPE_LEVEL_LOW>;
 	};
 
 	hdmi-encoder@39 {
 		compatible = "adi,adv7511w";
 		reg = <0x39>;
-		interrupt-parent = <&gpio1>;
-		interrupts = <1 IRQ_TYPE_LEVEL_LOW>;
+		interrupts-extended = <&gpio1 1 IRQ_TYPE_LEVEL_LOW>;
 
 		avdd-supply = <&reg_1p8v>;
 		dvdd-supply = <&reg_1p8v>;
@@ -436,10 +434,9 @@
 		compatible = "adi,adv7482";
 		reg = <0x70>;
 
-		interrupt-parent = <&gpio0>;
+		interrupts-extended = <&gpio0 7 IRQ_TYPE_LEVEL_LOW>,
+				      <&gpio0 17 IRQ_TYPE_LEVEL_LOW>;
 		interrupt-names = "intrq1", "intrq2";
-		interrupts = <7 IRQ_TYPE_LEVEL_LOW>,
-			     <17 IRQ_TYPE_LEVEL_LOW>;
 
 		ports {
 			#address-cells = <1>;
@@ -516,8 +513,7 @@
 
 		compatible = "rohm,bd9571mwv";
 		reg = <0x30>;
-		interrupt-parent = <&intc_ex>;
-		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+		interrupts-extended = <&intc_ex 0 IRQ_TYPE_LEVEL_LOW>;
 		interrupt-controller;
 		#interrupt-cells = <2>;
 		gpio-controller;
@@ -790,6 +786,7 @@
 &scif2 {
 	pinctrl-0 = <&scif2_pins>;
 	pinctrl-names = "default";
+	bootph-all;
 
 	status = "okay";
 };

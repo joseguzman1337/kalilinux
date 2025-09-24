@@ -45,33 +45,6 @@ enum {
 	CGX_STAT18,
 };
 
-/* NIX TX stats */
-enum nix_stat_lf_tx {
-	TX_UCAST	= 0x0,
-	TX_BCAST	= 0x1,
-	TX_MCAST	= 0x2,
-	TX_DROP		= 0x3,
-	TX_OCTS		= 0x4,
-	TX_STATS_ENUM_LAST,
-};
-
-/* NIX RX stats */
-enum nix_stat_lf_rx {
-	RX_OCTS		= 0x0,
-	RX_UCAST	= 0x1,
-	RX_BCAST	= 0x2,
-	RX_MCAST	= 0x3,
-	RX_DROP		= 0x4,
-	RX_DROP_OCTS	= 0x5,
-	RX_FCS		= 0x6,
-	RX_ERR		= 0x7,
-	RX_DRP_BCAST	= 0x8,
-	RX_DRP_MCAST	= 0x9,
-	RX_DRP_L3BCAST	= 0xa,
-	RX_DRP_L3MCAST	= 0xb,
-	RX_STATS_ENUM_LAST,
-};
-
 static char *cgx_rx_stats_fields[] = {
 	[CGX_STAT0]	= "Received packets",
 	[CGX_STAT1]	= "Octets of received packets",
@@ -668,16 +641,16 @@ static ssize_t rvu_dbg_lmtst_map_table_display(struct file *filp,
 
 RVU_DEBUG_FOPS(lmtst_map_table, lmtst_map_table_display, NULL);
 
-static void get_lf_str_list(struct rvu_block block, int pcifunc,
+static void get_lf_str_list(const struct rvu_block *block, int pcifunc,
 			    char *lfs)
 {
-	int lf = 0, seq = 0, len = 0, prev_lf = block.lf.max;
+	int lf = 0, seq = 0, len = 0, prev_lf = block->lf.max;
 
-	for_each_set_bit(lf, block.lf.bmap, block.lf.max) {
-		if (lf >= block.lf.max)
+	for_each_set_bit(lf, block->lf.bmap, block->lf.max) {
+		if (lf >= block->lf.max)
 			break;
 
-		if (block.fn_map[lf] != pcifunc)
+		if (block->fn_map[lf] != pcifunc)
 			continue;
 
 		if (lf == prev_lf + 1) {
@@ -715,7 +688,7 @@ static int get_max_column_width(struct rvu *rvu)
 
 	for (pf = 0; pf < rvu->hw->total_pfs; pf++) {
 		for (vf = 0; vf <= rvu->hw->total_vfs; vf++) {
-			pcifunc = pf << 10 | vf;
+			pcifunc = rvu_make_pcifunc(rvu->pdev, pf, vf);
 			if (!pcifunc)
 				continue;
 
@@ -724,7 +697,7 @@ static int get_max_column_width(struct rvu *rvu)
 				if (!strlen(block.name))
 					continue;
 
-				get_lf_str_list(block, pcifunc, buf);
+				get_lf_str_list(&block, pcifunc, buf);
 				if (lf_str_size <= strlen(buf))
 					lf_str_size = strlen(buf) + 1;
 			}
@@ -786,7 +759,7 @@ static ssize_t rvu_dbg_rsrc_attach_status(struct file *filp,
 		for (vf = 0; vf <= rvu->hw->total_vfs; vf++) {
 			off = 0;
 			flag = 0;
-			pcifunc = pf << 10 | vf;
+			pcifunc = rvu_make_pcifunc(rvu->pdev, pf, vf);
 			if (!pcifunc)
 				continue;
 
@@ -808,7 +781,7 @@ static ssize_t rvu_dbg_rsrc_attach_status(struct file *filp,
 					continue;
 				len = 0;
 				lfs[len] = '\0';
-				get_lf_str_list(block, pcifunc, lfs);
+				get_lf_str_list(&block, pcifunc, lfs);
 				if (strlen(lfs))
 					flag = 1;
 
@@ -869,7 +842,7 @@ static int rvu_dbg_rvu_pf_cgx_map_display(struct seq_file *filp, void *unused)
 
 		cgx[0] = 0;
 		lmac[0] = 0;
-		pcifunc = pf << 10;
+		pcifunc = rvu_make_pcifunc(rvu->pdev, pf, 0);
 		pfvf = rvu_get_pfvf(rvu, pcifunc);
 
 		if (pfvf->nix_blkaddr == BLKADDR_NIX0)
@@ -949,19 +922,18 @@ static void print_npa_qsize(struct seq_file *m, struct rvu_pfvf *pfvf)
 /* The 'qsize' entry dumps current Aura/Pool context Qsize
  * and each context's current enable/disable status in a bitmap.
  */
-static int rvu_dbg_qsize_display(struct seq_file *filp, void *unsused,
+static int rvu_dbg_qsize_display(struct seq_file *s, void *unsused,
 				 int blktype)
 {
-	void (*print_qsize)(struct seq_file *filp,
+	void (*print_qsize)(struct seq_file *s,
 			    struct rvu_pfvf *pfvf) = NULL;
-	struct dentry *current_dir;
 	struct rvu_pfvf *pfvf;
 	struct rvu *rvu;
 	int qsize_id;
 	u16 pcifunc;
 	int blkaddr;
 
-	rvu = filp->private;
+	rvu = s->private;
 	switch (blktype) {
 	case BLKTYPE_NPA:
 		qsize_id = rvu->rvu_dbg.npa_qsize_id;
@@ -977,32 +949,28 @@ static int rvu_dbg_qsize_display(struct seq_file *filp, void *unsused,
 		return -EINVAL;
 	}
 
-	if (blktype == BLKTYPE_NPA) {
+	if (blktype == BLKTYPE_NPA)
 		blkaddr = BLKADDR_NPA;
-	} else {
-		current_dir = filp->file->f_path.dentry->d_parent;
-		blkaddr = (!strcmp(current_dir->d_name.name, "nix1") ?
-				   BLKADDR_NIX1 : BLKADDR_NIX0);
-	}
+	else
+		blkaddr = debugfs_get_aux_num(s->file);
 
 	if (!rvu_dbg_is_valid_lf(rvu, blkaddr, qsize_id, &pcifunc))
 		return -EINVAL;
 
 	pfvf = rvu_get_pfvf(rvu, pcifunc);
-	print_qsize(filp, pfvf);
+	print_qsize(s, pfvf);
 
 	return 0;
 }
 
-static ssize_t rvu_dbg_qsize_write(struct file *filp,
+static ssize_t rvu_dbg_qsize_write(struct file *file,
 				   const char __user *buffer, size_t count,
 				   loff_t *ppos, int blktype)
 {
 	char *blk_string = (blktype == BLKTYPE_NPA) ? "npa" : "nix";
-	struct seq_file *seqfile = filp->private_data;
+	struct seq_file *seqfile = file->private_data;
 	char *cmd_buf, *cmd_buf_tmp, *subtoken;
 	struct rvu *rvu = seqfile->private;
-	struct dentry *current_dir;
 	int blkaddr;
 	u16 pcifunc;
 	int ret, lf;
@@ -1028,13 +996,10 @@ static ssize_t rvu_dbg_qsize_write(struct file *filp,
 		goto qsize_write_done;
 	}
 
-	if (blktype == BLKTYPE_NPA) {
+	if (blktype == BLKTYPE_NPA)
 		blkaddr = BLKADDR_NPA;
-	} else {
-		current_dir = filp->f_path.dentry->d_parent;
-		blkaddr = (!strcmp(current_dir->d_name.name, "nix1") ?
-				   BLKADDR_NIX1 : BLKADDR_NIX0);
-	}
+	else
+		blkaddr = debugfs_get_aux_num(file);
 
 	if (!rvu_dbg_is_valid_lf(rvu, blkaddr, lf, &pcifunc)) {
 		ret = -EINVAL;
@@ -2658,10 +2623,10 @@ static int rvu_dbg_nix_band_prof_ctx_display(struct seq_file *m, void *unused)
 			pcifunc = ipolicer->pfvf_map[idx];
 			if (!(pcifunc & RVU_PFVF_FUNC_MASK))
 				seq_printf(m, "Allocated to :: PF %d\n",
-					   rvu_get_pf(pcifunc));
+					   rvu_get_pf(rvu->pdev, pcifunc));
 			else
 				seq_printf(m, "Allocated to :: PF %d VF %d\n",
-					   rvu_get_pf(pcifunc),
+					   rvu_get_pf(rvu->pdev, pcifunc),
 					   (pcifunc & RVU_PFVF_FUNC_MASK) - 1);
 			print_band_prof_ctx(m, &aq_rsp.prof);
 		}
@@ -2736,8 +2701,8 @@ static void rvu_dbg_nix_init(struct rvu *rvu, int blkaddr)
 			    &rvu_dbg_nix_ndc_tx_hits_miss_fops);
 	debugfs_create_file("ndc_rx_hits_miss", 0600, rvu->rvu_dbg.nix, nix_hw,
 			    &rvu_dbg_nix_ndc_rx_hits_miss_fops);
-	debugfs_create_file("qsize", 0600, rvu->rvu_dbg.nix, rvu,
-			    &rvu_dbg_nix_qsize_fops);
+	debugfs_create_file_aux_num("qsize", 0600, rvu->rvu_dbg.nix, rvu,
+			    blkaddr, &rvu_dbg_nix_qsize_fops);
 	debugfs_create_file("ingress_policer_ctx", 0600, rvu->rvu_dbg.nix, nix_hw,
 			    &rvu_dbg_nix_band_prof_ctx_fops);
 	debugfs_create_file("ingress_policer_rsrc", 0600, rvu->rvu_dbg.nix, nix_hw,
@@ -2886,28 +2851,14 @@ static int cgx_print_stats(struct seq_file *s, int lmac_id)
 	return err;
 }
 
-static int rvu_dbg_derive_lmacid(struct seq_file *filp, int *lmac_id)
+static int rvu_dbg_derive_lmacid(struct seq_file *s)
 {
-	struct dentry *current_dir;
-	char *buf;
-
-	current_dir = filp->file->f_path.dentry->d_parent;
-	buf = strrchr(current_dir->d_name.name, 'c');
-	if (!buf)
-		return -EINVAL;
-
-	return kstrtoint(buf + 1, 10, lmac_id);
+	return debugfs_get_aux_num(s->file);
 }
 
-static int rvu_dbg_cgx_stat_display(struct seq_file *filp, void *unused)
+static int rvu_dbg_cgx_stat_display(struct seq_file *s, void *unused)
 {
-	int lmac_id, err;
-
-	err = rvu_dbg_derive_lmacid(filp, &lmac_id);
-	if (!err)
-		return cgx_print_stats(filp, lmac_id);
-
-	return err;
+	return cgx_print_stats(s, rvu_dbg_derive_lmacid(s));
 }
 
 RVU_DEBUG_SEQ_FOPS(cgx_stat, cgx_stat_display, NULL);
@@ -2965,15 +2916,9 @@ static int cgx_print_dmac_flt(struct seq_file *s, int lmac_id)
 	return 0;
 }
 
-static int rvu_dbg_cgx_dmac_flt_display(struct seq_file *filp, void *unused)
+static int rvu_dbg_cgx_dmac_flt_display(struct seq_file *s, void *unused)
 {
-	int err, lmac_id;
-
-	err = rvu_dbg_derive_lmacid(filp, &lmac_id);
-	if (!err)
-		return cgx_print_dmac_flt(filp, lmac_id);
-
-	return err;
+	return cgx_print_dmac_flt(s, rvu_dbg_derive_lmacid(s));
 }
 
 RVU_DEBUG_SEQ_FOPS(cgx_dmac_flt, cgx_dmac_flt_display, NULL);
@@ -3012,10 +2957,10 @@ static void rvu_dbg_cgx_init(struct rvu *rvu)
 			rvu->rvu_dbg.lmac =
 				debugfs_create_dir(dname, rvu->rvu_dbg.cgx);
 
-			debugfs_create_file("stats", 0600, rvu->rvu_dbg.lmac,
-					    cgx, &rvu_dbg_cgx_stat_fops);
-			debugfs_create_file("mac_filter", 0600,
-					    rvu->rvu_dbg.lmac, cgx,
+			debugfs_create_file_aux_num("stats", 0600, rvu->rvu_dbg.lmac,
+					    cgx, lmac_id, &rvu_dbg_cgx_stat_fops);
+			debugfs_create_file_aux_num("mac_filter", 0600,
+					    rvu->rvu_dbg.lmac, cgx, lmac_id,
 					    &rvu_dbg_cgx_dmac_flt_fops);
 		}
 	}
@@ -3038,10 +2983,10 @@ static void rvu_print_npc_mcam_info(struct seq_file *s,
 
 	if (!(pcifunc & RVU_PFVF_FUNC_MASK))
 		seq_printf(s, "\n\t\t Device \t\t: PF%d\n",
-			   rvu_get_pf(pcifunc));
+			   rvu_get_pf(rvu->pdev, pcifunc));
 	else
 		seq_printf(s, "\n\t\t Device \t\t: PF%d VF%d\n",
-			   rvu_get_pf(pcifunc),
+			   rvu_get_pf(rvu->pdev, pcifunc),
 			   (pcifunc & RVU_PFVF_FUNC_MASK) - 1);
 
 	if (entry_acnt) {
@@ -3104,13 +3049,13 @@ static int rvu_dbg_npc_mcam_info_display(struct seq_file *filp, void *unsued)
 	seq_puts(filp, "\n\t\t Current allocation\n");
 	seq_puts(filp, "\t\t====================\n");
 	for (pf = 0; pf < rvu->hw->total_pfs; pf++) {
-		pcifunc = (pf << RVU_PFVF_PF_SHIFT);
+		pcifunc = rvu_make_pcifunc(rvu->pdev, pf, 0);
 		rvu_print_npc_mcam_info(filp, pcifunc, blkaddr);
 
 		cfg = rvu_read64(rvu, BLKADDR_RVUM, RVU_PRIV_PFX_CFG(pf));
 		numvfs = (cfg >> 12) & 0xFF;
 		for (vf = 0; vf < numvfs; vf++) {
-			pcifunc = (pf << RVU_PFVF_PF_SHIFT) | (vf + 1);
+			pcifunc = rvu_make_pcifunc(rvu->pdev, pf, (vf + 1));
 			rvu_print_npc_mcam_info(filp, pcifunc, blkaddr);
 		}
 	}
@@ -3381,7 +3326,7 @@ static int rvu_dbg_npc_mcam_show_rules(struct seq_file *s, void *unused)
 
 	mutex_lock(&mcam->lock);
 	list_for_each_entry(iter, &mcam->mcam_rules, list) {
-		pf = (iter->owner >> RVU_PFVF_PF_SHIFT) & RVU_PFVF_PF_MASK;
+		pf = rvu_get_pf(rvu->pdev, iter->owner);
 		seq_printf(s, "\n\tInstalled by: PF%d ", pf);
 
 		if (iter->owner & RVU_PFVF_FUNC_MASK) {
@@ -3399,7 +3344,7 @@ static int rvu_dbg_npc_mcam_show_rules(struct seq_file *s, void *unused)
 		rvu_dbg_npc_mcam_show_flows(s, iter);
 		if (is_npc_intf_rx(iter->intf)) {
 			target = iter->rx_action.pf_func;
-			pf = (target >> RVU_PFVF_PF_SHIFT) & RVU_PFVF_PF_MASK;
+			pf = rvu_get_pf(rvu->pdev, target);
 			seq_printf(s, "\tForward to: PF%d ", pf);
 
 			if (target & RVU_PFVF_FUNC_MASK) {

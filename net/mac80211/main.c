@@ -5,7 +5,7 @@
  * Copyright 2006-2007	Jiri Benc <jbenc@suse.cz>
  * Copyright 2013-2014  Intel Mobile Communications GmbH
  * Copyright (C) 2017     Intel Deutschland GmbH
- * Copyright (C) 2018-2023 Intel Corporation
+ * Copyright (C) 2018-2024 Intel Corporation
  */
 
 #include <net/mac80211.h>
@@ -407,8 +407,19 @@ void ieee80211_link_info_change_notify(struct ieee80211_sub_if_data *sdata,
 
 	WARN_ON_ONCE(changed & BSS_CHANGED_VIF_CFG_FLAGS);
 
-	if (!changed || sdata->vif.type == NL80211_IFTYPE_AP_VLAN)
+	if (!changed)
 		return;
+
+	switch (sdata->vif.type) {
+	case NL80211_IFTYPE_AP_VLAN:
+		return;
+	case NL80211_IFTYPE_MONITOR:
+		if (!ieee80211_hw_check(&local->hw, WANT_MONITOR_VIF))
+			return;
+		break;
+	default:
+		break;
+	}
 
 	if (!check_sdata_in_driver(sdata))
 		return;
@@ -726,8 +737,13 @@ ieee80211_default_mgmt_stypes[NUM_NL80211_IFTYPES] = {
 	},
 	[NL80211_IFTYPE_P2P_DEVICE] = {
 		.tx = 0xffff,
+		/*
+		 * To support P2P PASN pairing let user space register to rx
+		 * also AUTH frames on P2P device interface.
+		 */
 		.rx = BIT(IEEE80211_STYPE_ACTION >> 4) |
-			BIT(IEEE80211_STYPE_PROBE_REQ >> 4),
+			BIT(IEEE80211_STYPE_PROBE_REQ >> 4) |
+			BIT(IEEE80211_STYPE_AUTH >> 4),
 	},
 };
 
@@ -1305,6 +1321,11 @@ int ieee80211_register_hw(struct ieee80211_hw *hw)
 			    sband->ht_cap.cap & IEEE80211_HT_CAP_SUP_WIDTH_20_40 &&
 			    !(iftd->he_cap.he_cap_elem.phy_cap_info[0] & he_40_mhz_cap))
 				return -EINVAL;
+
+			/* no support for per-band vendor elems with MLO */
+			if (WARN_ON(iftd->vendor_elems.len &&
+				    hw->wiphy->flags & WIPHY_FLAG_SUPPORTS_MLO))
+				return -EINVAL;
 		}
 
 		/* HT, VHT, HE require QoS, thus >= 4 queues */
@@ -1736,18 +1757,7 @@ void ieee80211_free_hw(struct ieee80211_hw *hw)
 	wiphy_free(local->hw.wiphy);
 }
 EXPORT_SYMBOL(ieee80211_free_hw);
-
-static const char * const drop_reasons_monitor[] = {
-#define V(x)	#x,
-	[0] = "RX_DROP_MONITOR",
-	MAC80211_DROP_REASONS_MONITOR(V)
-};
-
-static struct drop_reason_list drop_reason_list_monitor = {
-	.reasons = drop_reasons_monitor,
-	.n_reasons = ARRAY_SIZE(drop_reasons_monitor),
-};
-
+#define V(x)   #x,
 static const char * const drop_reasons_unusable[] = {
 	[0] = "RX_DROP_UNUSABLE",
 	MAC80211_DROP_REASONS_UNUSABLE(V)
@@ -1776,8 +1786,6 @@ static int __init ieee80211_init(void)
 	if (ret)
 		goto err_netdev;
 
-	drop_reasons_register_subsys(SKB_DROP_REASON_SUBSYS_MAC80211_MONITOR,
-				     &drop_reason_list_monitor);
 	drop_reasons_register_subsys(SKB_DROP_REASON_SUBSYS_MAC80211_UNUSABLE,
 				     &drop_reason_list_unusable);
 
@@ -1796,7 +1804,6 @@ static void __exit ieee80211_exit(void)
 
 	ieee80211_iface_exit();
 
-	drop_reasons_unregister_subsys(SKB_DROP_REASON_SUBSYS_MAC80211_MONITOR);
 	drop_reasons_unregister_subsys(SKB_DROP_REASON_SUBSYS_MAC80211_UNUSABLE);
 
 	rcu_barrier();

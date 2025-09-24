@@ -248,10 +248,8 @@ static int siw_qp_prepare_tx(struct siw_iwarp_tx *c_tx)
 		/*
 		 * Do complete CRC if enabled and short packet
 		 */
-		if (c_tx->mpa_crc_hd &&
-		    crypto_shash_digest(c_tx->mpa_crc_hd, (u8 *)&c_tx->pkt,
-					c_tx->ctrl_len, (u8 *)crc) != 0)
-			return -EINVAL;
+		if (c_tx->mpa_crc_enabled)
+			siw_crc_oneshot(&c_tx->pkt, c_tx->ctrl_len, (u8 *)crc);
 		c_tx->ctrl_len += MPA_CRC_SIZE;
 
 		return PKT_COMPLETE;
@@ -334,18 +332,17 @@ static int siw_tcp_sendpages(struct socket *s, struct page **page, int offset,
 		if (!sendpage_ok(page[i]))
 			msg.msg_flags &= ~MSG_SPLICE_PAGES;
 		bvec_set_page(&bvec, page[i], bytes, offset);
-		iov_iter_bvec(&msg.msg_iter, ITER_SOURCE, &bvec, 1, size);
+		iov_iter_bvec(&msg.msg_iter, ITER_SOURCE, &bvec, 1, bytes);
 
 try_page_again:
 		lock_sock(sk);
-		rv = tcp_sendmsg_locked(sk, &msg, size);
+		rv = tcp_sendmsg_locked(sk, &msg, bytes);
 		release_sock(sk);
 
 		if (rv > 0) {
 			size -= rv;
 			sent += rv;
 			if (rv != bytes) {
-				offset += rv;
 				bytes -= rv;
 				goto try_page_again;
 			}
@@ -482,9 +479,8 @@ static int siw_tx_hdt(struct siw_iwarp_tx *c_tx, struct socket *s)
 			iov[seg].iov_len = sge_len;
 
 			if (do_crc)
-				crypto_shash_update(c_tx->mpa_crc_hd,
-						    iov[seg].iov_base,
-						    sge_len);
+				siw_crc_update(&c_tx->mpa_crc,
+					       iov[seg].iov_base, sge_len);
 			sge_off += sge_len;
 			data_len -= sge_len;
 			seg++;
@@ -516,15 +512,14 @@ static int siw_tx_hdt(struct siw_iwarp_tx *c_tx, struct socket *s)
 					iov[seg].iov_len = plen;
 
 					if (do_crc)
-						crypto_shash_update(
-							c_tx->mpa_crc_hd,
+						siw_crc_update(
+							&c_tx->mpa_crc,
 							iov[seg].iov_base,
 							plen);
 				} else if (do_crc) {
 					kaddr = kmap_local_page(p);
-					crypto_shash_update(c_tx->mpa_crc_hd,
-							    kaddr + fp_off,
-							    plen);
+					siw_crc_update(&c_tx->mpa_crc,
+						       kaddr + fp_off, plen);
 					kunmap_local(kaddr);
 				}
 			} else {
@@ -536,10 +531,9 @@ static int siw_tx_hdt(struct siw_iwarp_tx *c_tx, struct socket *s)
 
 				page_array[seg] = ib_virt_dma_to_page(va);
 				if (do_crc)
-					crypto_shash_update(
-						c_tx->mpa_crc_hd,
-						ib_virt_dma_to_ptr(va),
-						plen);
+					siw_crc_update(&c_tx->mpa_crc,
+						       ib_virt_dma_to_ptr(va),
+						       plen);
 			}
 
 			sge_len -= plen;
@@ -576,14 +570,14 @@ sge_done:
 	if (c_tx->pad) {
 		*(u32 *)c_tx->trailer.pad = 0;
 		if (do_crc)
-			crypto_shash_update(c_tx->mpa_crc_hd,
-				(u8 *)&c_tx->trailer.crc - c_tx->pad,
-				c_tx->pad);
+			siw_crc_update(&c_tx->mpa_crc,
+				       (u8 *)&c_tx->trailer.crc - c_tx->pad,
+				       c_tx->pad);
 	}
-	if (!c_tx->mpa_crc_hd)
+	if (!c_tx->mpa_crc_enabled)
 		c_tx->trailer.crc = 0;
 	else if (do_crc)
-		crypto_shash_final(c_tx->mpa_crc_hd, (u8 *)&c_tx->trailer.crc);
+		siw_crc_final(&c_tx->mpa_crc, (u8 *)&c_tx->trailer.crc);
 
 	data_len = c_tx->bytes_unsent;
 
@@ -736,10 +730,9 @@ static void siw_prepare_fpdu(struct siw_qp *qp, struct siw_wqe *wqe)
 	/*
 	 * Init MPA CRC computation
 	 */
-	if (c_tx->mpa_crc_hd) {
-		crypto_shash_init(c_tx->mpa_crc_hd);
-		crypto_shash_update(c_tx->mpa_crc_hd, (u8 *)&c_tx->pkt,
-				    c_tx->ctrl_len);
+	if (c_tx->mpa_crc_enabled) {
+		siw_crc_init(&c_tx->mpa_crc);
+		siw_crc_update(&c_tx->mpa_crc, &c_tx->pkt, c_tx->ctrl_len);
 		c_tx->do_crc = 1;
 	}
 }

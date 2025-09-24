@@ -31,6 +31,7 @@
  * [1] https://gitlab.freedesktop.org/libevdev/hid-tools
  */
 
+#include <linux/bits.h>
 #include <linux/device.h>
 #include <linux/hid.h>
 #include <linux/module.h>
@@ -81,6 +82,13 @@ MODULE_LICENSE("GPL");
 enum latency_mode {
 	HID_LATENCY_NORMAL = 0,
 	HID_LATENCY_HIGH = 1,
+};
+
+enum report_mode {
+	TOUCHPAD_REPORT_NONE = 0,
+	TOUCHPAD_REPORT_BUTTONS = BIT(0),
+	TOUCHPAD_REPORT_CONTACTS = BIT(1),
+	TOUCHPAD_REPORT_ALL = TOUCHPAD_REPORT_BUTTONS | TOUCHPAD_REPORT_CONTACTS,
 };
 
 #define MT_IO_FLAGS_RUNNING		0
@@ -1291,7 +1299,7 @@ static void mt_touch_report(struct hid_device *hid,
 			mod_timer(&td->release_timer,
 				  jiffies + msecs_to_jiffies(100));
 		else
-			del_timer(&td->release_timer);
+			timer_delete(&td->release_timer);
 	}
 
 	clear_bit_unlock(MT_IO_FLAGS_RUNNING, &td->mt_io_flags);
@@ -1453,6 +1461,14 @@ static const __u8 *mt_report_fixup(struct hid_device *hdev, __u8 *rdesc,
 	if (hdev->vendor == I2C_VENDOR_ID_GOODIX &&
 	    (hdev->product == I2C_DEVICE_ID_GOODIX_01E8 ||
 	     hdev->product == I2C_DEVICE_ID_GOODIX_01E9)) {
+		if (*size < 608) {
+			dev_info(
+				&hdev->dev,
+				"GT7868Q fixup: report descriptor is only %u bytes, skipping\n",
+				*size);
+			return rdesc;
+		}
+
 		if (rdesc[607] == 0x15) {
 			rdesc[607] = 0x25;
 			dev_info(
@@ -1492,8 +1508,7 @@ static bool mt_need_to_apply_feature(struct hid_device *hdev,
 				     struct hid_field *field,
 				     struct hid_usage *usage,
 				     enum latency_mode latency,
-				     bool surface_switch,
-				     bool button_switch,
+				     enum report_mode report_mode,
 				     bool *inputmode_found)
 {
 	struct mt_device *td = hid_get_drvdata(hdev);
@@ -1548,11 +1563,11 @@ static bool mt_need_to_apply_feature(struct hid_device *hdev,
 		return true;
 
 	case HID_DG_SURFACESWITCH:
-		field->value[index] = surface_switch;
+		field->value[index] = !!(report_mode & TOUCHPAD_REPORT_CONTACTS);
 		return true;
 
 	case HID_DG_BUTTONSWITCH:
-		field->value[index] = button_switch;
+		field->value[index] = !!(report_mode & TOUCHPAD_REPORT_BUTTONS);
 		return true;
 	}
 
@@ -1560,7 +1575,7 @@ static bool mt_need_to_apply_feature(struct hid_device *hdev,
 }
 
 static void mt_set_modes(struct hid_device *hdev, enum latency_mode latency,
-			 bool surface_switch, bool button_switch)
+			 enum report_mode report_mode)
 {
 	struct hid_report_enum *rep_enum;
 	struct hid_report *rep;
@@ -1585,8 +1600,7 @@ static void mt_set_modes(struct hid_device *hdev, enum latency_mode latency,
 							     rep->field[i],
 							     usage,
 							     latency,
-							     surface_switch,
-							     button_switch,
+							     report_mode,
 							     &inputmode_found))
 					update_report = true;
 			}
@@ -1739,7 +1753,7 @@ static void mt_release_contacts(struct hid_device *hid)
 
 static void mt_expired_timeout(struct timer_list *t)
 {
-	struct mt_device *td = from_timer(td, t, release_timer);
+	struct mt_device *td = timer_container_of(td, t, release_timer);
 	struct hid_device *hdev = td->hdev;
 
 	/*
@@ -1832,7 +1846,7 @@ static int mt_probe(struct hid_device *hdev, const struct hid_device_id *id)
 		dev_warn(&hdev->dev, "Cannot allocate sysfs group for %s\n",
 				hdev->name);
 
-	mt_set_modes(hdev, HID_LATENCY_NORMAL, true, true);
+	mt_set_modes(hdev, HID_LATENCY_NORMAL, TOUCHPAD_REPORT_ALL);
 
 	return 0;
 }
@@ -1844,9 +1858,9 @@ static int mt_suspend(struct hid_device *hdev, pm_message_t state)
 	/* High latency is desirable for power savings during S3/S0ix */
 	if ((td->mtclass.quirks & MT_QUIRK_DISABLE_WAKEUP) ||
 	    !hid_hw_may_wakeup(hdev))
-		mt_set_modes(hdev, HID_LATENCY_HIGH, false, false);
+		mt_set_modes(hdev, HID_LATENCY_HIGH, TOUCHPAD_REPORT_NONE);
 	else
-		mt_set_modes(hdev, HID_LATENCY_HIGH, true, true);
+		mt_set_modes(hdev, HID_LATENCY_HIGH, TOUCHPAD_REPORT_ALL);
 
 	return 0;
 }
@@ -1854,7 +1868,7 @@ static int mt_suspend(struct hid_device *hdev, pm_message_t state)
 static int mt_reset_resume(struct hid_device *hdev)
 {
 	mt_release_contacts(hdev);
-	mt_set_modes(hdev, HID_LATENCY_NORMAL, true, true);
+	mt_set_modes(hdev, HID_LATENCY_NORMAL, TOUCHPAD_REPORT_ALL);
 	return 0;
 }
 
@@ -1866,7 +1880,7 @@ static int mt_resume(struct hid_device *hdev)
 
 	hid_hw_idle(hdev, 0, 0, HID_REQ_SET_IDLE);
 
-	mt_set_modes(hdev, HID_LATENCY_NORMAL, true, true);
+	mt_set_modes(hdev, HID_LATENCY_NORMAL, TOUCHPAD_REPORT_ALL);
 
 	return 0;
 }
@@ -1875,10 +1889,20 @@ static void mt_remove(struct hid_device *hdev)
 {
 	struct mt_device *td = hid_get_drvdata(hdev);
 
-	del_timer_sync(&td->release_timer);
+	timer_delete_sync(&td->release_timer);
 
 	sysfs_remove_group(&hdev->dev.kobj, &mt_attribute_group);
 	hid_hw_stop(hdev);
+}
+
+static void mt_on_hid_hw_open(struct hid_device *hdev)
+{
+	mt_set_modes(hdev, HID_LATENCY_NORMAL, TOUCHPAD_REPORT_ALL);
+}
+
+static void mt_on_hid_hw_close(struct hid_device *hdev)
+{
+	mt_set_modes(hdev, HID_LATENCY_HIGH, TOUCHPAD_REPORT_NONE);
 }
 
 /*
@@ -2116,11 +2140,17 @@ static const struct hid_device_id mt_devices[] = {
 		HID_DEVICE(BUS_I2C, HID_GROUP_GENERIC,
 			USB_VENDOR_ID_LG, I2C_DEVICE_ID_LG_7010) },
 
-	/* Lenovo X1 TAB Gen 2 */
+	/* Lenovo X1 TAB Gen 1 */
 	{ .driver_data = MT_CLS_WIN_8_FORCE_MULTI_INPUT,
 		HID_DEVICE(BUS_USB, HID_GROUP_MULTITOUCH_WIN_8,
 			   USB_VENDOR_ID_LENOVO,
 			   USB_DEVICE_ID_LENOVO_X1_TAB) },
+
+	/* Lenovo X1 TAB Gen 2 */
+	{ .driver_data = MT_CLS_WIN_8_FORCE_MULTI_INPUT,
+		HID_DEVICE(BUS_USB, HID_GROUP_MULTITOUCH_WIN_8,
+			   USB_VENDOR_ID_LENOVO,
+			   USB_DEVICE_ID_LENOVO_X1_TAB2) },
 
 	/* Lenovo X1 TAB Gen 3 */
 	{ .driver_data = MT_CLS_WIN_8_FORCE_MULTI_INPUT,
@@ -2348,5 +2378,7 @@ static struct hid_driver mt_driver = {
 	.suspend = pm_ptr(mt_suspend),
 	.reset_resume = pm_ptr(mt_reset_resume),
 	.resume = pm_ptr(mt_resume),
+	.on_hid_hw_open = mt_on_hid_hw_open,
+	.on_hid_hw_close = mt_on_hid_hw_close,
 };
 module_hid_driver(mt_driver);

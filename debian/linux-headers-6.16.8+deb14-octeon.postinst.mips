@@ -1,0 +1,11 @@
+#!/bin/sh -e
+
+<<<<<<<< HEAD:debian/linux-headers-6.12.38+kali-octeon.postinst
+version=6.12.38+kali-octeon
+========
+version=6.16.8+deb14-octeon
+>>>>>>>> debian:debian/linux-headers-6.16.8+deb14-octeon.postinst.mips
+
+linux-run-hooks headers postinst $version -- "$@"
+
+exit 0

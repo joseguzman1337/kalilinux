@@ -35,7 +35,6 @@
 #include "dml2_dc_resource_mgmt.h"
 #include "dml21_wrapper.h"
 
-
 static void initialize_dml2_ip_params(struct dml2_context *dml2, const struct dc *in_dc, struct ip_params_st *out)
 {
 	if (dml2->config.use_native_soc_bb_construction)
@@ -74,6 +73,7 @@ static void map_hw_resources(struct dml2_context *dml2,
 		in_out_display_cfg->hw.NumberOfDSCSlices[i] = mode_support_info->NumberOfDSCSlices[i];
 		in_out_display_cfg->hw.DLGRefClkFreqMHz = 24;
 		if (dml2->v20.dml_core_ctx.project != dml_project_dcn35 &&
+			dml2->v20.dml_core_ctx.project != dml_project_dcn36 &&
 			dml2->v20.dml_core_ctx.project != dml_project_dcn351) {
 			/*dGPU default as 50Mhz*/
 			in_out_display_cfg->hw.DLGRefClkFreqMHz = 50;
@@ -211,8 +211,6 @@ static bool optimize_configuration(struct dml2_context *dml2, struct dml2_wrappe
 				p->cur_display_config->output.OutputEncoder[0], p->cur_mode_support_info->DSCEnabled[0]) - 1;
 
 			if (odms_needed <= unused_dpps) {
-				unused_dpps -= odms_needed;
-
 				if (odms_needed == 1) {
 					p->new_policy->ODMUse[0] = dml_odm_use_policy_combine_2to1;
 					optimization_done = true;
@@ -665,7 +663,10 @@ static bool dml2_validate_and_build_resource(const struct dc *in_dc, struct dc_s
 		dml2_copy_clocks_to_dc_state(&out_clks, context);
 		dml2_extract_watermark_set(&context->bw_ctx.bw.dcn.watermarks.a, &dml2->v20.dml_core_ctx);
 		dml2_extract_watermark_set(&context->bw_ctx.bw.dcn.watermarks.b, &dml2->v20.dml_core_ctx);
-		memcpy(&context->bw_ctx.bw.dcn.watermarks.c, &dml2->v20.g6_temp_read_watermark_set, sizeof(context->bw_ctx.bw.dcn.watermarks.c));
+		if (context->streams[0]->sink->link->dc->caps.is_apu)
+			dml2_extract_watermark_set(&context->bw_ctx.bw.dcn.watermarks.c, &dml2->v20.dml_core_ctx);
+		else
+			memcpy(&context->bw_ctx.bw.dcn.watermarks.c, &dml2->v20.g6_temp_read_watermark_set, sizeof(context->bw_ctx.bw.dcn.watermarks.c));
 		dml2_extract_watermark_set(&context->bw_ctx.bw.dcn.watermarks.d, &dml2->v20.dml_core_ctx);
 		dml2_extract_writeback_wm(context, &dml2->v20.dml_core_ctx);
 		//copy for deciding zstate use
@@ -756,11 +757,10 @@ static inline struct dml2_context *dml2_allocate_memory(void)
 
 static void dml2_init(const struct dc *in_dc, const struct dml2_configuration_options *config, struct dml2_context **dml2)
 {
-	// TODO : Temporarily add DCN_VERSION_3_2 for N-1 validation. Remove DCN_VERSION_3_2 after N-1 validation phase is complete.
-        if ((in_dc->debug.using_dml21) && (in_dc->ctx->dce_version == DCN_VERSION_4_01 || in_dc->ctx->dce_version == DCN_VERSION_3_2)) {
-                dml21_reinit(in_dc, dml2, config);
+	if ((in_dc->debug.using_dml21) && (in_dc->ctx->dce_version == DCN_VERSION_4_01)) {
+		dml21_reinit(in_dc, dml2, config);
 		return;
-        }
+	}
 
 	// Store config options
 	(*dml2)->config = *config;
@@ -771,6 +771,9 @@ static void dml2_init(const struct dc *in_dc, const struct dml2_configuration_op
 		break;
 	case DCN_VERSION_3_51:
 		(*dml2)->v20.dml_core_ctx.project = dml_project_dcn351;
+		break;
+	case DCN_VERSION_3_6:
+		(*dml2)->v20.dml_core_ctx.project = dml_project_dcn36;
 		break;
 	case DCN_VERSION_3_2:
 		(*dml2)->v20.dml_core_ctx.project = dml_project_dcn32;
@@ -800,9 +803,10 @@ static void dml2_init(const struct dc *in_dc, const struct dml2_configuration_op
 bool dml2_create(const struct dc *in_dc, const struct dml2_configuration_options *config, struct dml2_context **dml2)
 {
 	// TODO : Temporarily add DCN_VERSION_3_2 for N-1 validation. Remove DCN_VERSION_3_2 after N-1 validation phase is complete.
-	if ((in_dc->debug.using_dml21) && (in_dc->ctx->dce_version == DCN_VERSION_4_01 || in_dc->ctx->dce_version == DCN_VERSION_3_2)) {
+	if ((in_dc->debug.using_dml21)
+			&& (in_dc->ctx->dce_version == DCN_VERSION_4_01
+		))
 		return dml21_create(in_dc, dml2, config);
-	}
 
 	// Allocate Mode Lib Ctx
 	*dml2 = dml2_allocate_memory();
@@ -870,8 +874,7 @@ void dml2_reinit(const struct dc *in_dc,
 				 const struct dml2_configuration_options *config,
 				 struct dml2_context **dml2)
 {
-	// TODO : Temporarily add DCN_VERSION_3_2 for N-1 validation. Remove DCN_VERSION_3_2 after N-1 validation phase is complete.
-	if ((in_dc->debug.using_dml21) && (in_dc->ctx->dce_version == DCN_VERSION_4_01 || in_dc->ctx->dce_version == DCN_VERSION_3_2)) {
+	if ((in_dc->debug.using_dml21) && (in_dc->ctx->dce_version == DCN_VERSION_4_01)) {
 		dml21_reinit(in_dc, dml2, config);
 		return;
 	}

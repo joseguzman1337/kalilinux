@@ -1297,11 +1297,14 @@ int gfs2_alloc_extent(struct inode *inode, u64 lblock, u64 *dblock,
  * uses iomap write to perform its actions, which begin their own transactions
  * (iomap_begin, get_folio, etc.)
  */
-static int gfs2_block_zero_range(struct inode *inode, loff_t from,
-				 unsigned int length)
+static int gfs2_block_zero_range(struct inode *inode, loff_t from, loff_t length)
 {
 	BUG_ON(current->journal_info);
-	return iomap_zero_range(inode, from, length, NULL, &gfs2_iomap_ops);
+	if (from >= inode->i_size)
+		return 0;
+	length = min(length, inode->i_size - from);
+	return iomap_zero_range(inode, from, length, NULL, &gfs2_iomap_ops,
+			NULL);
 }
 
 #define GFS2_JTRUNC_REVOKES 8192

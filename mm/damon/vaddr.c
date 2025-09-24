@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * DAMON Primitives for Virtual Address Spaces
+ * DAMON Code for Virtual Address Spaces
  *
  * Author: SeongJae Park <sj@kernel.org>
  */
@@ -71,6 +71,9 @@ static int damon_va_evenly_split_region(struct damon_target *t,
 
 	if (!r || !nr_pieces)
 		return -EINVAL;
+
+	if (nr_pieces == 1)
+		return 0;
 
 	orig_end = r->ar.end;
 	sz_orig = damon_sz_region(r);
@@ -353,11 +356,9 @@ static void damon_hugetlb_mkold(pte_t *pte, struct mm_struct *mm,
 		set_huge_pte_at(mm, addr, pte, entry, psize);
 	}
 
-#ifdef CONFIG_MMU_NOTIFIER
 	if (mmu_notifier_clear_young(mm, addr,
 				     addr + huge_page_size(hstate_vma(vma))))
 		referenced = true;
-#endif /* CONFIG_MMU_NOTIFIER */
 
 	if (referenced)
 		folio_set_young(folio);
@@ -654,7 +655,7 @@ static unsigned long damos_madvise(struct damon_target *target,
 
 static unsigned long damon_va_apply_scheme(struct damon_ctx *ctx,
 		struct damon_target *t, struct damon_region *r,
-		struct damos *scheme)
+		struct damos *scheme, unsigned long *sz_filter_passed)
 {
 	int madv_action;
 
@@ -709,7 +710,6 @@ static int __init damon_va_initcall(void)
 		.update = damon_va_update,
 		.prepare_access_checks = damon_va_prepare_access_checks,
 		.check_accesses = damon_va_check_accesses,
-		.reset_aggregated = NULL,
 		.target_valid = damon_va_target_valid,
 		.cleanup = NULL,
 		.apply_scheme = damon_va_apply_scheme,

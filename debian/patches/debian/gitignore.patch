@@ -10,7 +10,29 @@ Forwarded: not-needed
 
 --- a/.gitignore
 +++ b/.gitignore
-@@ -175,3 +175,10 @@ sphinx_*/
+@@ -108,21 +108,6 @@ modules.order
+ /pacman/
+ 
+ #
+-# We don't want to ignore the following even if they are dot-files
+-#
+-!.clang-format
+-!.clippy.toml
+-!.cocciconfig
+-!.editorconfig
+-!.get_maintainer.ignore
+-!.gitattributes
+-!.gitignore
+-!.kunitconfig
+-!.mailmap
+-!.pylintrc
+-!.rustfmt.toml
+-
+-#
+ # Generated include files
+ #
+ /include/config/
+@@ -184,3 +169,10 @@ sphinx_*/
  
  # Rust analyzer configuration
  /rust-project.json

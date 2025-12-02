@@ -80,9 +80,7 @@ features/all/lockdown/mtd-disable-slram-and-phram-when-locked-down.patch
 features/all/lockdown/arm64-add-kernel-config-option-to-lock-down-when.patch
 
 # Improve integrity platform keyring for kernel modules verification
-features/all/db-mok-keyring/0003-MODSIGN-checking-the-blacklisted-hash-before-loading-a-kernel-module.patch
 features/all/db-mok-keyring/KEYS-Make-use-of-platform-keyring-for-module-signature.patch
-features/all/db-mok-keyring/trust-machine-keyring-by-default.patch
 
 # Security fixes
 
@@ -103,8 +101,6 @@ bugfix/all/perf-tools-pass-extra_cflags-through-to-libbpf-build-again.patch
 bugfix/all/kbuild-bpf-fix-btf-reproducibility.patch
 bugfix/all/perf-docs-Fix-perf-check-manual-page-built-with-asci.patch
 bugfix/all/libbpf-use-the-standard-fixdep-build-rule.patch
-bugfix/all/tools-bootconfig-cleanup-bootconfig-footer-size-calc.patch
-bugfix/all/bootconfig-fix-unaligned-access-when-building-footer.patch
-bugfix/all/bootconfig-fix-negative-seeks-on-32-bit-with-lfs-ena.patch
+bugfix/all/tools-hv-Make-the-sample-hv_get_dhcp_info-script-mor.patch
 
 # ABI maintenance

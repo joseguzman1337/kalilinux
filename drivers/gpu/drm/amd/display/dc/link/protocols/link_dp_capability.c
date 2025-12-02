@@ -1388,6 +1388,21 @@ void dpcd_set_source_specific_data(struct dc_link *link)
 		struct dpcd_amd_signature amd_signature = {0};
 		struct dpcd_amd_device_id amd_device_id = {0};
 
+		if (link->is_dds) {
+			uint8_t dpcd_dp_edp_backlight_mode = 0;
+
+			/*
+			 * Write 0 to bits 0:1 for dp_edp_backlight_mode_set register
+			 * if platform is DDS
+			 */
+			core_link_read_dpcd(link, DP_EDP_BACKLIGHT_MODE_SET_REGISTER,
+				&dpcd_dp_edp_backlight_mode, sizeof(uint8_t));
+			dpcd_dp_edp_backlight_mode &= ~0x3;
+
+			core_link_write_dpcd(link, DP_EDP_BACKLIGHT_MODE_SET_REGISTER,
+				&dpcd_dp_edp_backlight_mode, sizeof(uint8_t));
+		}
+
 		amd_device_id.device_id_byte1 =
 				(uint8_t)(link->ctx->asic_id.chip_id);
 		amd_device_id.device_id_byte2 =
@@ -1543,6 +1558,10 @@ static bool dpcd_read_sink_ext_caps(struct dc_link *link)
 		return false;
 
 	link->dpcd_sink_ext_caps.raw = dpcd_data;
+	if (link->is_dds && !link->dpcd_sink_ext_caps.bits.oled) {
+		link->dpcd_sink_ext_caps.raw = 0;
+		return false;
+	}
 
 	if (core_link_read_dpcd(link, DP_EDP_GENERAL_CAP_2, &edp_general_cap2, 1) != DC_OK)
 		return false;
@@ -1672,7 +1691,7 @@ static bool retrieve_link_cap(struct dc_link *link)
 	union edp_configuration_cap edp_config_cap;
 	union dp_downstream_port_present ds_port = { 0 };
 	enum dc_status status = DC_ERROR_UNEXPECTED;
-	uint32_t read_dpcd_retry_cnt = 3;
+	uint32_t read_dpcd_retry_cnt = 20;
 	int i;
 	struct dp_sink_hw_fw_revision dp_hw_fw_revision;
 	const uint32_t post_oui_delay = 30; // 30ms
@@ -1715,12 +1734,13 @@ static bool retrieve_link_cap(struct dc_link *link)
 	}
 
 	dpcd_set_source_specific_data(link);
-	/* Sink may need to configure internals based on vendor, so allow some
-	 * time before proceeding with possibly vendor specific transactions
-	 */
-	msleep(post_oui_delay);
 
 	for (i = 0; i < read_dpcd_retry_cnt; i++) {
+		/*
+		 * Sink may need to configure internals based on vendor, so allow some
+		 * time before proceeding with possibly vendor specific transactions
+		 */
+		msleep(post_oui_delay);
 		status = core_link_read_dpcd(
 				link,
 				DP_DPCD_REV,

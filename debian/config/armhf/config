@@ -44,8 +44,6 @@ CONFIG_ARCH_VIRT=y
 CONFIG_CRYPTO_GHASH_ARM_CE=m
 CONFIG_CRYPTO_NHPOLY1305_NEON=m
 CONFIG_CRYPTO_BLAKE2B_NEON=m
-CONFIG_CRYPTO_SHA1_ARM_NEON=m
-CONFIG_CRYPTO_SHA1_ARM_CE=m
 CONFIG_CRYPTO_AES_ARM_BS=m
 CONFIG_CRYPTO_AES_ARM_CE=m
 
@@ -303,7 +301,6 @@ CONFIG_CRYPTO_DEV_MARVELL_CESA=m
 ##
 ## file: drivers/crypto/stm32/Kconfig
 ##
-CONFIG_CRYPTO_DEV_STM32_CRC=m
 CONFIG_CRYPTO_DEV_STM32_HASH=m
 CONFIG_CRYPTO_DEV_STM32_CRYP=m
 
@@ -714,6 +711,7 @@ CONFIG_TEGRA_IOMMU_SMMU=y
 ##
 CONFIG_LEDS_CLASS=y
 CONFIG_LEDS_ARIEL=m
+CONFIG_LEDS_TURRIS_OMNIA=m
 CONFIG_LEDS_LP5523=m
 CONFIG_LEDS_PCA963X=m
 CONFIG_LEDS_DA9052=m
@@ -774,6 +772,11 @@ CONFIG_VIDEO_IMX_PXP=m
 ## file: drivers/media/platform/rockchip/rga/Kconfig
 ##
 CONFIG_VIDEO_ROCKCHIP_RGA=m
+
+##
+## file: drivers/media/platform/rockchip/rkvdec/Kconfig
+##
+CONFIG_VIDEO_ROCKCHIP_VDEC=m
 
 ##
 ## file: drivers/media/platform/ti/Kconfig
@@ -1449,11 +1452,6 @@ CONFIG_STAGING_MEDIA=y
 CONFIG_VIDEO_IMX_MEDIA=m
 
 ##
-## file: drivers/staging/media/rkvdec/Kconfig
-##
-CONFIG_VIDEO_ROCKCHIP_VDEC=m
-
-##
 ## file: drivers/staging/media/sunxi/Kconfig
 ##
 CONFIG_VIDEO_SUNXI=y
@@ -1735,7 +1733,7 @@ CONFIG_NET_NCSI=y
 CONFIG_PHONET=m
 
 ##
-## file: sound/pci/hda/Kconfig
+## file: sound/hda/controllers/Kconfig
 ##
 CONFIG_SND_HDA_TEGRA=m
 
@@ -1790,7 +1788,6 @@ CONFIG_SND_MMP_SOC_SSPA=m
 ##
 ## file: sound/soc/rockchip/Kconfig
 ##
-CONFIG_SND_SOC_ROCKCHIP=m
 CONFIG_SND_SOC_ROCKCHIP_I2S=m
 CONFIG_SND_SOC_ROCKCHIP_SPDIF=m
 CONFIG_SND_SOC_ROCKCHIP_MAX98090=m

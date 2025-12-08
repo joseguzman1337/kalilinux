@@ -1,0 +1,23 @@
+# Some 32-bit architectures need 64-bit kernels and we still build
+# these as the "wrong" architecture rather than mandating multiarch.
+<<<<<<< HEAD:debian/linux-image-6.16.8+deb14-loongson-3.lintian-overrides.mipsel
+<<<<<<<< HEAD:debian/linux-image-6.12.38+kali-loongson-3.lintian-overrides
+linux-image-6.12.38+kali-loongson-3: binary-from-other-architecture *boot/vmlinu*
+linux-image-6.12.38+kali-loongson-3: binary-from-other-architecture *lib/modules/*
+
+# vmlinux needs extra sections that would normally be stripped.
+linux-image-6.12.38+kali-loongson-3: unstripped-binary-or-object *boot/vmlinu*
+========
+linux-image-6.16.8+deb14-loongson-3: binary-from-other-architecture *boot/vmlinu*
+linux-image-6.16.8+deb14-loongson-3: binary-from-other-architecture *lib/modules/*
+
+# vmlinux needs extra sections that would normally be stripped.
+linux-image-6.16.8+deb14-loongson-3: unstripped-binary-or-object *boot/vmlinu*
+>>>>>>>> debian:debian/linux-image-6.16.8+deb14-loongson-3.lintian-overrides.mipsel
+=======
+linux-image-6.17.10+deb14-4kc-malta: binary-from-other-architecture *boot/vmlinu*
+linux-image-6.17.10+deb14-4kc-malta: binary-from-other-architecture *lib/modules/*
+
+# vmlinux needs extra sections that would normally be stripped.
+linux-image-6.17.10+deb14-4kc-malta: unstripped-binary-or-object *boot/vmlinu*
+>>>>>>> debian:debian/linux-image-6.17.10+deb14-4kc-malta.lintian-overrides.mipsel

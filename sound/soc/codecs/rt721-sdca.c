@@ -281,6 +281,10 @@ static void rt721_sdca_jack_preset(struct rt721_sdca_priv *rt721)
 	rt_sdca_index_write(rt721->mbq_regmap, RT721_BOOST_CTRL,
 		RT721_BST_4CH_TOP_GATING_CTRL1, 0x002a);
 	regmap_write(rt721->regmap, 0x2f58, 0x07);
+
+	regmap_write(rt721->regmap, 0x2f51, 0x00);
+	rt_sdca_index_write(rt721->mbq_regmap, RT721_HDA_SDCA_FLOAT,
+		RT721_MISC_CTL, 0x0004);
 }
 
 static void rt721_sdca_jack_init(struct rt721_sdca_priv *rt721)
@@ -329,7 +333,6 @@ static int rt721_sdca_set_jack_detect(struct snd_soc_component *component,
 
 	rt721_sdca_jack_init(rt721);
 
-	pm_runtime_mark_last_busy(component->dev);
 	pm_runtime_put_autosuspend(component->dev);
 
 	return 0;
@@ -1550,7 +1553,6 @@ int rt721_sdca_io_init(struct device *dev, struct sdw_slave *slave)
 	/* Mark Slave initialization complete */
 	rt721->hw_init = true;
 
-	pm_runtime_mark_last_busy(&slave->dev);
 	pm_runtime_put_autosuspend(&slave->dev);
 
 	dev_dbg(&slave->dev, "%s hw_init complete\n", __func__);

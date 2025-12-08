@@ -190,6 +190,31 @@ static int airoha_ppe_flow_mangle_ipv4(const struct flow_action_entry *act,
 	return 0;
 }
 
+static int airoha_ppe_get_wdma_info(struct net_device *dev, const u8 *addr,
+				    struct airoha_wdma_info *info)
+{
+	struct net_device_path_stack stack;
+	struct net_device_path *path;
+	int err;
+
+	if (!dev)
+		return -ENODEV;
+
+	err = dev_fill_forward_path(dev, addr, &stack);
+	if (err)
+		return err;
+
+	path = &stack.path[stack.num_paths - 1];
+	if (path->type != DEV_PATH_MTK_WDMA)
+		return -1;
+
+	info->idx = path->mtk_wdma.wdma_idx;
+	info->bss = path->mtk_wdma.bss;
+	info->wcid = path->mtk_wdma.wcid;
+
+	return 0;
+}
+
 static int airoha_get_dsa_port(struct net_device **dev)
 {
 #if IS_ENABLED(CONFIG_NET_DSA)
@@ -220,9 +245,9 @@ static int airoha_ppe_foe_entry_prepare(struct airoha_eth *eth,
 					struct airoha_flow_data *data,
 					int l4proto)
 {
-	int dsa_port = airoha_get_dsa_port(&dev);
+	u32 qdata = FIELD_PREP(AIROHA_FOE_SHAPER_ID, 0x7f), ports_pad, val;
+	int wlan_etype = -EINVAL, dsa_port = airoha_get_dsa_port(&dev);
 	struct airoha_foe_mac_info_common *l2;
-	u32 qdata, ports_pad, val;
 	u8 smac_id = 0xf;
 
 	memset(hwe, 0, sizeof(*hwe));
@@ -232,34 +257,51 @@ static int airoha_ppe_foe_entry_prepare(struct airoha_eth *eth,
 	      FIELD_PREP(AIROHA_FOE_IB1_BIND_UDP, l4proto == IPPROTO_UDP) |
 	      FIELD_PREP(AIROHA_FOE_IB1_BIND_VLAN_LAYER, data->vlan.num) |
 	      FIELD_PREP(AIROHA_FOE_IB1_BIND_VPM, data->vlan.num) |
+	      FIELD_PREP(AIROHA_FOE_IB1_BIND_PPPOE, data->pppoe.num) |
 	      AIROHA_FOE_IB1_BIND_TTL;
 	hwe->ib1 = val;
 
-	val = FIELD_PREP(AIROHA_FOE_IB2_PORT_AG, 0x1f) |
-	      AIROHA_FOE_IB2_PSE_QOS;
-	if (dsa_port >= 0)
-		val |= FIELD_PREP(AIROHA_FOE_IB2_NBQ, dsa_port);
-
+	val = FIELD_PREP(AIROHA_FOE_IB2_PORT_AG, 0x1f);
 	if (dev) {
-		struct airoha_gdm_port *port = netdev_priv(dev);
-		u8 pse_port;
+		struct airoha_wdma_info info = {};
 
-		if (!airoha_is_valid_gdm_port(eth, port))
-			return -EINVAL;
+		if (!airoha_ppe_get_wdma_info(dev, data->eth.h_dest, &info)) {
+			val |= FIELD_PREP(AIROHA_FOE_IB2_NBQ, info.idx) |
+			       FIELD_PREP(AIROHA_FOE_IB2_PSE_PORT,
+					  FE_PSE_PORT_CDM4);
+			qdata |= FIELD_PREP(AIROHA_FOE_ACTDP, info.bss);
+			wlan_etype = FIELD_PREP(AIROHA_FOE_MAC_WDMA_BAND,
+						info.idx) |
+				     FIELD_PREP(AIROHA_FOE_MAC_WDMA_WCID,
+						info.wcid);
+		} else {
+			struct airoha_gdm_port *port = netdev_priv(dev);
+			u8 pse_port;
 
-		if (dsa_port >= 0)
-			pse_port = port->id == 4 ? FE_PSE_PORT_GDM4 : port->id;
-		else
-			pse_port = 2; /* uplink relies on GDM2 loopback */
-		val |= FIELD_PREP(AIROHA_FOE_IB2_PSE_PORT, pse_port);
+			if (!airoha_is_valid_gdm_port(eth, port))
+				return -EINVAL;
 
-		/* For downlink traffic consume SRAM memory for hw forwarding
-		 * descriptors queue.
-		 */
-		if (airhoa_is_lan_gdm_port(port))
-			val |= AIROHA_FOE_IB2_FAST_PATH;
+			if (dsa_port >= 0 || eth->ports[1])
+				pse_port = port->id == 4 ? FE_PSE_PORT_GDM4
+							 : port->id;
+			else
+				pse_port = 2; /* uplink relies on GDM2
+					       * loopback
+					       */
 
-		smac_id = port->id;
+			val |= FIELD_PREP(AIROHA_FOE_IB2_PSE_PORT, pse_port) |
+			       AIROHA_FOE_IB2_PSE_QOS;
+			/* For downlink traffic consume SRAM memory for hw
+			 * forwarding descriptors queue.
+			 */
+			if (airhoa_is_lan_gdm_port(port))
+				val |= AIROHA_FOE_IB2_FAST_PATH;
+			if (dsa_port >= 0)
+				val |= FIELD_PREP(AIROHA_FOE_IB2_NBQ,
+						  dsa_port);
+
+			smac_id = port->id;
+		}
 	}
 
 	if (is_multicast_ether_addr(data->eth.h_dest))
@@ -271,7 +313,6 @@ static int airoha_ppe_foe_entry_prepare(struct airoha_eth *eth,
 	if (type == PPE_PKT_TYPE_IPV6_ROUTE_3T)
 		hwe->ipv6.ports = ports_pad;
 
-	qdata = FIELD_PREP(AIROHA_FOE_SHAPER_ID, 0x7f);
 	if (type == PPE_PKT_TYPE_BRIDGE) {
 		airoha_ppe_foe_set_bridge_addrs(&hwe->bridge, &data->eth);
 		hwe->bridge.data = qdata;
@@ -281,33 +322,44 @@ static int airoha_ppe_foe_entry_prepare(struct airoha_eth *eth,
 		hwe->ipv6.data = qdata;
 		hwe->ipv6.ib2 = val;
 		l2 = &hwe->ipv6.l2;
+		l2->etype = ETH_P_IPV6;
 	} else {
 		hwe->ipv4.data = qdata;
 		hwe->ipv4.ib2 = val;
 		l2 = &hwe->ipv4.l2.common;
+		l2->etype = ETH_P_IP;
 	}
 
 	l2->dest_mac_hi = get_unaligned_be32(data->eth.h_dest);
 	l2->dest_mac_lo = get_unaligned_be16(data->eth.h_dest + 4);
 	if (type <= PPE_PKT_TYPE_IPV4_DSLITE) {
+		struct airoha_foe_mac_info *mac_info;
+
 		l2->src_mac_hi = get_unaligned_be32(data->eth.h_source);
 		hwe->ipv4.l2.src_mac_lo =
 			get_unaligned_be16(data->eth.h_source + 4);
+
+		mac_info = (struct airoha_foe_mac_info *)l2;
+		mac_info->pppoe_id = data->pppoe.sid;
 	} else {
-		l2->src_mac_hi = FIELD_PREP(AIROHA_FOE_MAC_SMAC_ID, smac_id);
+		l2->src_mac_hi = FIELD_PREP(AIROHA_FOE_MAC_SMAC_ID, smac_id) |
+				 FIELD_PREP(AIROHA_FOE_MAC_PPPOE_ID,
+					    data->pppoe.sid);
 	}
 
 	if (data->vlan.num) {
-		l2->etype = dsa_port >= 0 ? BIT(dsa_port) : 0;
 		l2->vlan1 = data->vlan.hdr[0].id;
 		if (data->vlan.num == 2)
 			l2->vlan2 = data->vlan.hdr[1].id;
+	}
+
+	if (wlan_etype >= 0) {
+		l2->etype = wlan_etype;
 	} else if (dsa_port >= 0) {
-		l2->etype = BIT(15) | BIT(dsa_port);
-	} else if (type >= PPE_PKT_TYPE_IPV6_ROUTE_3T) {
-		l2->etype = ETH_P_IPV6;
-	} else {
-		l2->etype = ETH_P_IP;
+		l2->etype = BIT(dsa_port);
+		l2->etype |= !data->vlan.num ? BIT(15) : 0;
+	} else if (data->pppoe.num) {
+		l2->etype = ETH_P_PPP_SES;
 	}
 
 	return 0;
@@ -480,6 +532,10 @@ static void airoha_ppe_foe_flow_stats_update(struct airoha_ppe *ppe,
 		meter = &hwe->ipv4.l2.meter;
 	}
 
+	pse_port = FIELD_GET(AIROHA_FOE_IB2_PSE_PORT, *ib2);
+	if (pse_port == FE_PSE_PORT_CDM4)
+		return;
+
 	airoha_ppe_foe_flow_stat_entry_reset(ppe, npu, index);
 
 	val = FIELD_GET(AIROHA_FOE_CHANNEL | AIROHA_FOE_QID, *data);
@@ -490,7 +546,6 @@ static void airoha_ppe_foe_flow_stats_update(struct airoha_ppe *ppe,
 		      AIROHA_FOE_IB2_PSE_QOS | AIROHA_FOE_IB2_FAST_PATH);
 	*meter |= FIELD_PREP(AIROHA_FOE_TUNNEL_MTU, val);
 
-	pse_port = FIELD_GET(AIROHA_FOE_IB2_PSE_PORT, *ib2);
 	nbq = pse_port == 1 ? 6 : 5;
 	*ib2 &= ~(AIROHA_FOE_IB2_NBQ | AIROHA_FOE_IB2_PSE_PORT |
 		  AIROHA_FOE_IB2_PSE_QOS);
@@ -971,6 +1026,11 @@ static int airoha_ppe_flow_offload_replace(struct airoha_gdm_port *port,
 		case FLOW_ACTION_VLAN_POP:
 			break;
 		case FLOW_ACTION_PPPOE_PUSH:
+			if (data.pppoe.num == 1 || data.vlan.num == 2)
+				return -EOPNOTSUPP;
+
+			data.pppoe.sid = act->pppoe.sid;
+			data.pppoe.num++;
 			break;
 		default:
 			return -EOPNOTSUPP;

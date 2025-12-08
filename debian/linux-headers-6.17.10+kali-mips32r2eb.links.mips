@@ -1,0 +1,4 @@
+usr/lib/linux-kbuild-6.17.10+kali/scripts                          usr/src/linux-headers-6.17.10+kali-mips32r2eb/scripts
+usr/lib/linux-kbuild-6.17.10+kali/tools                            usr/src/linux-headers-6.17.10+kali-mips32r2eb/tools
+usr/src/linux-headers-6.17.10+kali-mips32r2eb                                               usr/lib/modules/6.17.10+kali-mips32r2eb/build
+usr/src/linux-headers-6.17.10+kali-common  usr/lib/modules/6.17.10+kali-mips32r2eb/source

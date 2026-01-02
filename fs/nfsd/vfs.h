@@ -67,7 +67,8 @@ static inline bool nfsd_attrs_valid(struct nfsd_attrs *attrs)
 	struct iattr *iap = attrs->na_iattr;
 
 	return (iap->ia_valid || (attrs->na_seclabel &&
-		attrs->na_seclabel->len));
+		attrs->na_seclabel->len) ||
+		attrs->na_pacl || attrs->na_dpacl);
 }
 
 __be32		nfserrno (int errno);
@@ -159,42 +160,5 @@ __be32		nfsd_permission(struct svc_cred *cred, struct svc_export *exp,
 				struct dentry *dentry, int acc);
 
 void		nfsd_filp_close(struct file *fp);
-
-static inline int fh_want_write(struct svc_fh *fh)
-{
-	int ret;
-
-	if (fh->fh_want_write)
-		return 0;
-	ret = mnt_want_write(fh->fh_export->ex_path.mnt);
-	if (!ret)
-		fh->fh_want_write = true;
-	return ret;
-}
-
-static inline void fh_drop_write(struct svc_fh *fh)
-{
-	if (fh->fh_want_write) {
-		fh->fh_want_write = false;
-		mnt_drop_write(fh->fh_export->ex_path.mnt);
-	}
-}
-
-static inline __be32 fh_getattr(const struct svc_fh *fh, struct kstat *stat)
-{
-	u32 request_mask = STATX_BASIC_STATS;
-	struct path p = {.mnt = fh->fh_export->ex_path.mnt,
-			 .dentry = fh->fh_dentry};
-	struct inode *inode = d_inode(p.dentry);
-
-	if (S_ISREG(inode->i_mode))
-		request_mask |= (STATX_DIOALIGN | STATX_DIO_READ_ALIGN);
-
-	if (fh->fh_maxsize == NFS4_FHSIZE)
-		request_mask |= (STATX_BTIME | STATX_CHANGE_COOKIE);
-
-	return nfserrno(vfs_getattr(&p, stat, request_mask,
-				    AT_STATX_SYNC_AS_STAT));
-}
 
 #endif /* LINUX_NFSD_VFS_H */

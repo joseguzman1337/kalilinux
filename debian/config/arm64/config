@@ -1,6 +1,8 @@
 ##
 ## file: arch/Kconfig
 ##
+CONFIG_SCHED_SMT=y
+CONFIG_SCHED_MC=y
 CONFIG_SECCOMP=y
 
 ##
@@ -20,8 +22,6 @@ CONFIG_ARM64_4K_PAGES=y
 ## choice: Virtual address space size
 CONFIG_ARM64_VA_BITS_52=y
 ## end choice
-CONFIG_SCHED_MC=y
-CONFIG_SCHED_SMT=y
 CONFIG_NR_CPUS=512
 CONFIG_NUMA=y
 CONFIG_XEN=y
@@ -622,6 +622,7 @@ CONFIG_QCOM_QSEECOM_UEFISECAPP=y
 ## file: drivers/gpio/Kconfig
 ##
 CONFIG_GPIOLIB=y
+CONFIG_GPIO_BRCMSTB=m
 CONFIG_GPIO_DAVINCI=y
 CONFIG_GPIO_MB86S7X=m
 CONFIG_GPIO_MPC8XXX=y
@@ -858,7 +859,7 @@ CONFIG_I2C_HID_OF_GOODIX=m
 ##
 ## file: drivers/hv/Kconfig
 ##
-CONFIG_HYPERV=m
+CONFIG_HYPERV=y
 CONFIG_HYPERV_UTILS=m
 CONFIG_HYPERV_BALLOON=m
 
@@ -1240,6 +1241,11 @@ CONFIG_SRAM=y
 CONFIG_NSM=m
 
 ##
+## file: drivers/misc/rp1/Kconfig
+##
+CONFIG_MISC_RP1=m
+
+##
 ## file: drivers/mmc/Kconfig
 ##
 CONFIG_MMC=y
@@ -1275,6 +1281,7 @@ CONFIG_MMC_DW_ROCKCHIP=m
 CONFIG_MMC_SUNXI=m
 CONFIG_MMC_BCM2835=m
 CONFIG_MMC_MTK=m
+CONFIG_MMC_SDHCI_BRCMSTB=m
 CONFIG_MMC_SDHCI_XENON=m
 CONFIG_MMC_SDHCI_AM654=m
 
@@ -1513,6 +1520,11 @@ CONFIG_8139CP=m
 CONFIG_8139TOO=m
 
 ##
+## file: drivers/net/ethernet/renesas/Kconfig
+##
+CONFIG_RAVB=m
+
+##
 ## file: drivers/net/ethernet/smsc/Kconfig
 ##
 CONFIG_NET_VENDOR_SMSC=y
@@ -1675,6 +1687,11 @@ CONFIG_NVMEM_ROCKCHIP_EFUSE=m
 CONFIG_NVMEM_ROCKCHIP_OTP=m
 CONFIG_NVMEM_SPMI_SDAM=m
 CONFIG_NVMEM_SUNXI_SID=m
+
+##
+## file: drivers/of/Kconfig
+##
+CONFIG_OF_OVERLAY=y
 
 ##
 ## file: drivers/pci/Kconfig
@@ -1888,6 +1905,16 @@ CONFIG_PINCTRL_ROCKCHIP=y
 CONFIG_PINCTRL_SINGLE=y
 
 ##
+## file: drivers/pinctrl/bcm/Kconfig
+##
+CONFIG_PINCTRL_BRCMSTB=m
+
+##
+## file: drivers/pinctrl/bcm/Kconfig.stb
+##
+CONFIG_PINCTRL_BCM2712=m
+
+##
 ## file: drivers/pinctrl/freescale/Kconfig
 ##
 CONFIG_PINCTRL_IMX8MM=y
@@ -1947,6 +1974,12 @@ CONFIG_PINCTRL_SM8250=m
 CONFIG_PINCTRL_X1E80100=m
 
 ##
+## file: drivers/platform/arm64/Kconfig
+##
+CONFIG_ARM64_PLATFORM_DEVICES=y
+CONFIG_EC_LENOVO_YOGA_C630=m
+
+##
 ## file: drivers/platform/chrome/Kconfig
 ##
 CONFIG_CHROME_PLATFORMS=y
@@ -2000,6 +2033,7 @@ CONFIG_SYSCON_REBOOT_MODE=m
 ## file: drivers/power/supply/Kconfig
 ##
 CONFIG_BATTERY_CW2015=m
+CONFIG_BATTERY_LENOVO_YOGA_C630=m
 CONFIG_BATTERY_QCOM_BATTMGR=m
 CONFIG_BATTERY_SBS=m
 CONFIG_BATTERY_BQ27XXX=m
@@ -2154,7 +2188,6 @@ CONFIG_SCSI_HISI_SAS_PCI=m
 ##
 ## file: drivers/slimbus/Kconfig
 ##
-CONFIG_SLIM_QCOM_CTRL=m
 CONFIG_SLIM_QCOM_NGD_CTRL=m
 
 ##
@@ -2611,9 +2644,6 @@ CONFIG_ENERGY_MODEL=y
 ## file: lib/Kconfig.debug
 ##
 CONFIG_DEBUG_INFO_BTF=y
-#. Workaround module loading of different builds of on-disk modules
-#. vs booted kernel when keeping same ABI, cf. #1003210, #1022202
-CONFIG_MODULE_ALLOW_BTF_MISMATCH=y
 
 ##
 ## file: mm/Kconfig

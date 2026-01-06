@@ -535,16 +535,13 @@ void nfsd_destroy_serv(struct net *net)
 #endif
 	}
 
-	svc_xprt_destroy_all(serv, net);
-
 	/*
 	 * write_ports can create the server without actually starting
-	 * any threads--if we get shut down before any threads are
+	 * any threads.  If we get shut down before any threads are
 	 * started, then nfsd_destroy_serv will be run before any of this
 	 * other initialization has been done except the rpcb information.
 	 */
-	svc_rpcb_cleanup(serv, net);
-
+	svc_xprt_destroy_all(serv, net, true);
 	nfsd_shutdown_net(net);
 	svc_destroy(&serv);
 }
@@ -636,12 +633,15 @@ int nfsd_create_serv(struct net *net)
 	serv = svc_create_pooled(nfsd_programs, ARRAY_SIZE(nfsd_programs),
 				 &nn->nfsd_svcstats,
 				 nfsd_max_blksize, nfsd);
-	if (serv == NULL)
+	if (serv == NULL) {
+		percpu_ref_exit(&nn->nfsd_net_ref);
 		return -ENOMEM;
+	}
 
 	error = svc_bind(serv, net);
 	if (error < 0) {
 		svc_destroy(&serv);
+		percpu_ref_exit(&nn->nfsd_net_ref);
 		return error;
 	}
 	spin_lock(&nfsd_notifier_lock);

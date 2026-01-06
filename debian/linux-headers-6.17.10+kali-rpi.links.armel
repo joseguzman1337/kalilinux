@@ -1,4 +1,0 @@
-usr/lib/linux-kbuild-6.17.10+kali/scripts                          usr/src/linux-headers-6.17.10+kali-rpi/scripts
-usr/lib/linux-kbuild-6.17.10+kali/tools                            usr/src/linux-headers-6.17.10+kali-rpi/tools
-usr/src/linux-headers-6.17.10+kali-rpi                                               usr/lib/modules/6.17.10+kali-rpi/build
-usr/src/linux-headers-6.17.10+kali-common  usr/lib/modules/6.17.10+kali-rpi/source

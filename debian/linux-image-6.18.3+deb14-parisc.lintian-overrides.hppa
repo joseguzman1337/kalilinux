@@ -1,0 +1,9 @@
+# Some 32-bit architectures need 64-bit kernels and we still build
+# these as the "wrong" architecture rather than mandating multiarch.
+linux-image-6.18.3+deb14-parisc: binary-from-other-architecture *lib/modules/*
+
+# vmlinux needs extra sections that would normally be stripped.
+<<<<<<<< HEAD:debian/linux-image-6.17.10+kali-octeon.lintian-overrides.mips64el
+linux-image-6.17.10+kali-octeon: unstripped-binary-or-object *boot/vmlinu*
+========
+>>>>>>>> debian:debian/linux-image-6.18.3+deb14-parisc.lintian-overrides.hppa

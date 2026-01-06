@@ -1,0 +1,9 @@
+# Some 32-bit architectures need 64-bit kernels and we still build
+# these as the "wrong" architecture rather than mandating multiarch.
+
+# vmlinux needs extra sections that would normally be stripped.
+<<<<<<<< HEAD:debian/linux-image-6.17.10+kali-loongson-3.lintian-overrides.mips64el
+linux-image-6.17.10+kali-loongson-3: unstripped-binary-or-object *boot/vmlinu*
+========
+linux-image-6.18.3+deb14-powerpc64le-64k: unstripped-binary-or-object *boot/vmlinu*
+>>>>>>>> debian:debian/linux-image-6.18.3+deb14-powerpc64le-64k.lintian-overrides.ppc64el

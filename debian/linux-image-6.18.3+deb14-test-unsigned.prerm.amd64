@@ -1,0 +1,18 @@
+#!/bin/sh -e
+
+<<<<<<<< HEAD:debian/linux-image-6.17.10+kali-rpi.prerm.armel
+version=6.17.10+kali-rpi
+========
+version=6.18.3+deb14-test
+>>>>>>>> debian:debian/linux-image-6.18.3+deb14-test-unsigned.prerm.amd64
+image_path=/boot/vmlinuz-$version
+
+if [ "$1" != remove ]; then
+    exit 0
+fi
+
+linux-check-removal $version
+
+linux-run-hooks image prerm $version $image_path -- "$@"
+
+exit 0

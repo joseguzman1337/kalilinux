@@ -1,0 +1,11 @@
+#!/bin/sh -e
+
+<<<<<<<< HEAD:debian/linux-headers-6.17.10+kali-loongson-3.postinst.mips64el
+version=6.17.10+kali-loongson-3
+========
+version=6.18.3+deb14-cloud-amd64
+>>>>>>>> debian:debian/linux-headers-6.18.3+deb14-cloud-amd64.postinst.amd64
+
+linux-run-hooks headers postinst $version -- "$@"
+
+exit 0

@@ -310,6 +310,8 @@ cifs_abort_connection(struct TCP_Server_Info *server)
 			 server->ssocket->flags);
 		sock_release(server->ssocket);
 		server->ssocket = NULL;
+	} else if (cifs_rdma_enabled(server)) {
+		smbd_destroy(server);
 	}
 	server->sequence_number = 0;
 	server->session_estab = false;
@@ -337,12 +339,6 @@ cifs_abort_connection(struct TCP_Server_Info *server)
 		list_del_init(&mid->qhead);
 		mid_execute_callback(mid);
 		release_mid(mid);
-	}
-
-	if (cifs_rdma_enabled(server)) {
-		cifs_server_lock(server);
-		smbd_destroy(server);
-		cifs_server_unlock(server);
 	}
 }
 
@@ -4455,6 +4451,7 @@ cifs_construct_tcon(struct cifs_sb_info *cifs_sb, kuid_t fsuid)
 
 out:
 	kfree(ctx->username);
+	kfree(ctx->domainname);
 	kfree_sensitive(ctx->password);
 	kfree(origin_fullpath);
 	kfree(ctx);

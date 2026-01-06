@@ -1,9 +1,0 @@
-<<<<<<<< HEAD:debian/linux-headers-6.17.10+kali-armmp.install.armhf
-.config .kernel* Module.symvers include  usr/src/linux-headers-6.17.10+kali-armmp
-scripts/module.lds                       usr/src/linux-headers-6.17.10+kali-armmp/arch/arm
-arch/arm/include             usr/src/linux-headers-6.17.10+kali-armmp/arch/arm
-========
-.config .kernel* Module.symvers include  usr/src/linux-headers-6.18.3+deb14-armmp
-scripts/module.lds                       usr/src/linux-headers-6.18.3+deb14-armmp/arch/arm
-arch/arm/include             usr/src/linux-headers-6.18.3+deb14-armmp/arch/arm
->>>>>>>> debian:debian/linux-headers-6.18.3+deb14-armmp.install.armhf

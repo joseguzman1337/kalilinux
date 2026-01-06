@@ -1,9 +1,0 @@
-<<<<<<<< HEAD:debian/linux-headers-6.17.10+kali-rpi.install.armel
-.config .kernel* Module.symvers include  usr/src/linux-headers-6.17.10+kali-rpi
-scripts/module.lds                       usr/src/linux-headers-6.17.10+kali-rpi/arch/arm
-arch/arm/include             usr/src/linux-headers-6.17.10+kali-rpi/arch/arm
-========
-.config .kernel* Module.symvers include  usr/src/linux-headers-6.18.3+deb14-test
-scripts/module.lds                       usr/src/linux-headers-6.18.3+deb14-test/arch/x86
-arch/x86/include             usr/src/linux-headers-6.18.3+deb14-test/arch/x86
->>>>>>>> debian:debian/linux-headers-6.18.3+deb14-test.install.amd64

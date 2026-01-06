@@ -5,57 +5,57 @@ Maintainer: Debian Kernel Team <debian-kernel@lists.debian.org>
 Uploaders: Bastian Blank <waldi@debian.org>, maximilian attems <maks@debian.org>, Ben Hutchings <benh@debian.org>, Salvatore Bonaccorso <carnil@debian.org>
 Standards-Version: 4.2.0
 Build-Depends: debhelper-compat (= 13), python3:any, sbsigntool [amd64 arm64]
-Build-Depends-Arch: kernel-wedge (>= 2.105~) [amd64] <!pkg.linux.nokernel> <pkg.linux.quick !noudeb !pkg.linux.nokernel>, kmod [amd64] <!pkg.linux.nokernel> <pkg.linux.quick !noudeb !pkg.linux.nokernel>, linux-image-6.18.3+deb14-amd64-unsigned (= @signedtemplate_binaryversion@) [amd64] <!pkg.linux.nokernel !pkg.linux.quick>, linux-image-6.18.3+deb14-cloud-amd64-unsigned (= @signedtemplate_binaryversion@) [amd64] <!pkg.linux.nokernel !pkg.linux.quick>, linux-image-6.18.3+deb14-rt-amd64-unsigned (= @signedtemplate_binaryversion@) [amd64] <!pkg.linux.nokernel !pkg.linux.quick>, linux-image-6.18.3+deb14-test-unsigned (= @signedtemplate_binaryversion@) [amd64] <pkg.linux.quick !pkg.linux.nokernel>, rsync [amd64] <!pkg.linux.nokernel>
+Build-Depends-Arch: kernel-wedge (>= 2.105~) [amd64] <!pkg.linux.nokernel> <pkg.linux.quick !noudeb !pkg.linux.nokernel>, kmod [amd64] <!pkg.linux.nokernel> <pkg.linux.quick !noudeb !pkg.linux.nokernel>, linux-image-6.18.3+kali-amd64-unsigned (= @signedtemplate_binaryversion@) [amd64] <!pkg.linux.nokernel !pkg.linux.quick>, linux-image-6.18.3+kali-cloud-amd64-unsigned (= @signedtemplate_binaryversion@) [amd64] <!pkg.linux.nokernel !pkg.linux.quick>, linux-image-6.18.3+kali-rt-amd64-unsigned (= @signedtemplate_binaryversion@) [amd64] <!pkg.linux.nokernel !pkg.linux.quick>, linux-image-6.18.3+kali-test-unsigned (= @signedtemplate_binaryversion@) [amd64] <pkg.linux.quick !pkg.linux.nokernel>, rsync [amd64] <!pkg.linux.nokernel>
 Rules-Requires-Root: no
 Homepage: https://www.kernel.org/
 Vcs-Browser: https://salsa.debian.org/kernel-team/linux
 Vcs-Git: https://salsa.debian.org/kernel-team/linux.git
 
-Package: linux-image-6.18.3+deb14-amd64
+Package: linux-image-6.18.3+kali-amd64
 Architecture: amd64
 Build-Profiles: <!pkg.linux.nokernel !pkg.linux.quick>
-Built-Using: linux (= 6.18.3-1)
+Built-Using: linux (= 6.18.3-1kali1)
 Pre-Depends: linux-base (>= 4.12~)
-Depends: dracut [amd64] | initramfs-tools (>= 0.120+deb8u2) [amd64] | linux-initramfs-tool [amd64], kmod, linux-base-6.18.3+deb14-amd64 (= @signedtemplate_binaryversion@), ${misc:Depends}
+Depends: dracut [amd64] | initramfs-tools (>= 0.120+deb8u2) [amd64] | linux-initramfs-tool [amd64], kmod, linux-base-6.18.3+kali-amd64 (= @signedtemplate_binaryversion@), ${misc:Depends}
 Recommends: apparmor [amd64]
 Suggests: debian-kernel-handbook, firmware-linux-free, grub-pc [amd64] | grub-efi-amd64 [amd64] | extlinux [amd64], linux-doc-6.18
-Replaces: linux-image-6.18.3+deb14-amd64-unsigned
+Replaces: linux-image-6.18.3+kali-amd64-unsigned
 Breaks: fwupdate (<< 12-7) [amd64], initramfs-tools (<< 0.120+deb8u2) [amd64], wireless-regdb (<< 2019.06.03-1~) [amd64]
-Conflicts: linux-image-6.18.3+deb14-amd64-unsigned
+Conflicts: linux-image-6.18.3+kali-amd64-unsigned
 Description: Linux 6.18.3 for 64-bit PCs (signed)
  The Linux kernel 6.18.3 and modules for use on PCs with AMD64, Intel 64 or
  VIA Nano processors.
  .
  The kernel image is signed for use with Secure Boot.
 
-Package: linux-image-6.18.3+deb14-cloud-amd64
+Package: linux-image-6.18.3+kali-cloud-amd64
 Architecture: amd64
 Build-Profiles: <!pkg.linux.nokernel !pkg.linux.quick>
-Built-Using: linux (= 6.18.3-1)
+Built-Using: linux (= 6.18.3-1kali1)
 Pre-Depends: linux-base (>= 4.12~)
-Depends: dracut [amd64] | initramfs-tools (>= 0.120+deb8u2) [amd64] | linux-initramfs-tool [amd64], kmod, linux-base-6.18.3+deb14-cloud-amd64 (= @signedtemplate_binaryversion@), ${misc:Depends}
+Depends: dracut [amd64] | initramfs-tools (>= 0.120+deb8u2) [amd64] | linux-initramfs-tool [amd64], kmod, linux-base-6.18.3+kali-cloud-amd64 (= @signedtemplate_binaryversion@), ${misc:Depends}
 Recommends: apparmor [amd64]
 Suggests: debian-kernel-handbook, firmware-linux-free, grub-pc [amd64] | grub-efi-amd64 [amd64] | extlinux [amd64], linux-doc-6.18
-Replaces: linux-image-6.18.3+deb14-cloud-amd64-unsigned
+Replaces: linux-image-6.18.3+kali-cloud-amd64-unsigned
 Breaks: fwupdate (<< 12-7) [amd64], initramfs-tools (<< 0.120+deb8u2) [amd64], wireless-regdb (<< 2019.06.03-1~) [amd64]
-Conflicts: linux-image-6.18.3+deb14-cloud-amd64-unsigned
+Conflicts: linux-image-6.18.3+kali-cloud-amd64-unsigned
 Description: Linux 6.18.3 for x86-64 cloud (signed)
  The Linux kernel 6.18.3 and modules for use on cloud platforms including
  Amazon EC2, Microsoft Azure, and Google Compute Engine.
  .
  The kernel image is signed for use with Secure Boot.
 
-Package: linux-image-6.18.3+deb14-rt-amd64
+Package: linux-image-6.18.3+kali-rt-amd64
 Architecture: amd64
 Build-Profiles: <!pkg.linux.nokernel !pkg.linux.quick>
-Built-Using: linux (= 6.18.3-1)
+Built-Using: linux (= 6.18.3-1kali1)
 Pre-Depends: linux-base (>= 4.12~)
-Depends: dracut [amd64] | initramfs-tools (>= 0.120+deb8u2) [amd64] | linux-initramfs-tool [amd64], kmod, linux-base-6.18.3+deb14-rt-amd64 (= @signedtemplate_binaryversion@), ${misc:Depends}
+Depends: dracut [amd64] | initramfs-tools (>= 0.120+deb8u2) [amd64] | linux-initramfs-tool [amd64], kmod, linux-base-6.18.3+kali-rt-amd64 (= @signedtemplate_binaryversion@), ${misc:Depends}
 Recommends: apparmor [amd64]
 Suggests: debian-kernel-handbook, firmware-linux-free, grub-pc [amd64] | grub-efi-amd64 [amd64] | extlinux [amd64], linux-doc-6.18
-Replaces: linux-image-6.18.3+deb14-rt-amd64-unsigned
+Replaces: linux-image-6.18.3+kali-rt-amd64-unsigned
 Breaks: fwupdate (<< 12-7) [amd64], initramfs-tools (<< 0.120+deb8u2) [amd64], wireless-regdb (<< 2019.06.03-1~) [amd64]
-Conflicts: linux-image-6.18.3+deb14-rt-amd64-unsigned
+Conflicts: linux-image-6.18.3+kali-rt-amd64-unsigned
 Description: Linux 6.18.3 for 64-bit PCs (signed), PREEMPT_RT
  The Linux kernel 6.18.3 and modules for use on PCs with AMD64, Intel 64 or
  VIA Nano processors.
@@ -64,43 +64,43 @@ Description: Linux 6.18.3 for 64-bit PCs (signed), PREEMPT_RT
  .
  This kernel is configured with PREEMPT_RT real time support.
 
-Package: linux-image-6.18.3+deb14-test
+Package: linux-image-6.18.3+kali-test
 Architecture: amd64
 Build-Profiles: <pkg.linux.quick !pkg.linux.nokernel>
-Built-Using: linux (= 6.18.3-1)
+Built-Using: linux (= 6.18.3-1kali1)
 Pre-Depends: linux-base (>= 4.12~)
-Depends: dracut [amd64] | initramfs-tools (>= 0.120+deb8u2) [amd64] | linux-initramfs-tool [amd64], kmod, linux-base-6.18.3+deb14-test (= @signedtemplate_binaryversion@), ${misc:Depends}
+Depends: dracut [amd64] | initramfs-tools (>= 0.120+deb8u2) [amd64] | linux-initramfs-tool [amd64], kmod, linux-base-6.18.3+kali-test (= @signedtemplate_binaryversion@), ${misc:Depends}
 Recommends: apparmor [amd64]
 Suggests: debian-kernel-handbook, firmware-linux-free, grub-pc [amd64] | grub-efi-amd64 [amd64] | extlinux [amd64], linux-doc-6.18
-Replaces: linux-image-6.18.3+deb14-test-unsigned
+Replaces: linux-image-6.18.3+kali-test-unsigned
 Breaks: fwupdate (<< 12-7) [amd64], initramfs-tools (<< 0.120+deb8u2) [amd64], wireless-regdb (<< 2019.06.03-1~) [amd64]
-Conflicts: linux-image-6.18.3+deb14-test-unsigned
+Conflicts: linux-image-6.18.3+kali-test-unsigned
 Description: Linux 6.18.3 for  (signed)
  The Linux kernel 6.18.3 and modules for use on .
  .
  The kernel image is signed for use with Secure Boot.
 
-Package: kernel-image-6.18.3+deb14-amd64-di
+Package: kernel-image-6.18.3+kali-amd64-di
 Architecture: amd64
 Section: debian-installer
 Priority: standard
 Package-Type: udeb
 Build-Profiles: <!noudeb !pkg.linux.nokernel !pkg.linux.quick>
 Provides: kernel-image
-Kernel-Version: 6.18.3+deb14-amd64
+Kernel-Version: 6.18.3+kali-amd64
 Description: Linux kernel image and core modules for the Debian installer
  This package contains the kernel image and core modules for the Debian
  installer boot images.  It does _not_ provide a usable kernel for your
  full Debian system.
 
-Package: kernel-image-6.18.3+deb14-test-di
+Package: kernel-image-6.18.3+kali-test-di
 Architecture: amd64
 Section: debian-installer
 Priority: standard
 Package-Type: udeb
 Build-Profiles: <pkg.linux.quick !noudeb !pkg.linux.nokernel>
 Provides: kernel-image
-Kernel-Version: 6.18.3+deb14-test
+Kernel-Version: 6.18.3+kali-test
 Description: Linux kernel image and core modules for the Debian installer
  This package contains the kernel image and core modules for the Debian
  installer boot images.  It does _not_ provide a usable kernel for your

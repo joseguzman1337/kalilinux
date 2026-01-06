@@ -1,0 +1,4 @@
+usr/lib/linux-kbuild-6.18.3+kali/scripts                          usr/src/linux-headers-6.18.3+kali-alpha-smp/scripts
+usr/lib/linux-kbuild-6.18.3+kali/tools                            usr/src/linux-headers-6.18.3+kali-alpha-smp/tools
+usr/src/linux-headers-6.18.3+kali-alpha-smp                                               usr/lib/modules/6.18.3+kali-alpha-smp/build
+usr/src/linux-headers-6.18.3+kali-common  usr/lib/modules/6.18.3+kali-alpha-smp/source

@@ -1,4 +1,0 @@
-usr/lib/linux-kbuild-6.18.3+kali/scripts                          usr/src/linux-headers-6.18.3+kali-test/scripts
-usr/lib/linux-kbuild-6.18.3+kali/tools                            usr/src/linux-headers-6.18.3+kali-test/tools
-usr/src/linux-headers-6.18.3+kali-test                                               usr/lib/modules/6.18.3+kali-test/build
-usr/src/linux-headers-6.18.3+kali-common  usr/lib/modules/6.18.3+kali-test/source

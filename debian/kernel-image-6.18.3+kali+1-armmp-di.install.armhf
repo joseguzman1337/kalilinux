@@ -1,0 +1,3 @@
+boot/vmlinu?-6.18.3+kali+1-armmp
+lib/modules/6.18.3+kali+1-armmp/modules.builtin  lib/modules/6.18.3+kali+1-armmp
+lib/modules/6.18.3+kali+1-armmp/modules.order    lib/modules/6.18.3+kali+1-armmp

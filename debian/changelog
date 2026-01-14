@@ -1,3 +1,9 @@
+linux (6.18.3-1kali2) kali-experimental; urgency=medium
+
+  * Do not enable signed kernel in Kali
+
+ -- Sophie Brun <sophie@kali.org>  Wed, 14 Jan 2026 08:21:36 +0100
+
 linux (6.18.3-1kali1) kali-experimental; urgency=medium
 
   * Sync with Debian

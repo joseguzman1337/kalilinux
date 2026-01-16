@@ -1,3 +1,10 @@
+linux (6.18.3-1kali3) kali-experimental; urgency=medium
+
+  [ Bastian Blank ]
+  * Fix installation of dtb into kernel-image udebs.
+
+ -- Sophie Brun <sophie@kali.org>  Fri, 16 Jan 2026 10:53:02 +0100
+
 linux (6.18.3-1kali2) kali-experimental; urgency=medium
 
   * Do not enable signed kernel in Kali

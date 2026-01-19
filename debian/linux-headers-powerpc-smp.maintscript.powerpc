@@ -1,5 +1,1 @@
-<<<<<<< HEAD
-dir_to_symlink /usr/share/doc/linux-headers-powerpc-smp linux-headers-6.18.3+kali+2-powerpc-smp 5.7~rc5-1~exp1 linux-headers-powerpc-smp
-=======
-dir_to_symlink /usr/share/doc/linux-headers-powerpc-smp linux-headers-6.18.5+deb14-powerpc-smp 5.7~rc5-1~exp1 linux-headers-powerpc-smp
->>>>>>> debian
+dir_to_symlink /usr/share/doc/linux-headers-powerpc-smp linux-headers-6.18.5+kali-powerpc-smp 5.7~rc5-1~exp1 linux-headers-powerpc-smp

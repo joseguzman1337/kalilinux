@@ -1,9 +1,0 @@
-# Some 32-bit architectures need 64-bit kernels and we still build
-# these as the "wrong" architecture rather than mandating multiarch.
-<<<<<<<< HEAD:debian/linux-image-6.18.3+kali+2-powerpc64le.lintian-overrides.ppc64el
-========
-linux-image-6.18.5+deb14-parisc: binary-from-other-architecture *lib/modules/*
->>>>>>>> debian:debian/linux-image-6.18.5+deb14-parisc.lintian-overrides.hppa
-
-# vmlinux needs extra sections that would normally be stripped.
-linux-image-6.18.3+kali+2-powerpc64le: unstripped-binary-or-object *boot/vmlinu*

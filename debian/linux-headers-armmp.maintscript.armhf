@@ -1,5 +1,1 @@
-<<<<<<< HEAD
-dir_to_symlink /usr/share/doc/linux-headers-armmp linux-headers-6.18.3+kali+2-armmp 5.7~rc5-1~exp1 linux-headers-armmp
-=======
-dir_to_symlink /usr/share/doc/linux-headers-armmp linux-headers-6.18.5+deb14-armmp 5.7~rc5-1~exp1 linux-headers-armmp
->>>>>>> debian
+dir_to_symlink /usr/share/doc/linux-headers-armmp linux-headers-6.18.5+kali-armmp 5.7~rc5-1~exp1 linux-headers-armmp

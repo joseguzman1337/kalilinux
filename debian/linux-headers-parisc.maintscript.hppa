@@ -1,5 +1,1 @@
-<<<<<<< HEAD
-dir_to_symlink /usr/share/doc/linux-headers-parisc linux-headers-6.18.3+kali+2-parisc 5.7~rc5-1~exp1 linux-headers-parisc
-=======
-dir_to_symlink /usr/share/doc/linux-headers-parisc linux-headers-6.18.5+deb14-parisc 5.7~rc5-1~exp1 linux-headers-parisc
->>>>>>> debian
+dir_to_symlink /usr/share/doc/linux-headers-parisc linux-headers-6.18.5+kali-parisc 5.7~rc5-1~exp1 linux-headers-parisc

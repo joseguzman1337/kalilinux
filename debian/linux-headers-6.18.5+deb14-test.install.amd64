@@ -1,0 +1,9 @@
+<<<<<<<< HEAD:debian/linux-headers-6.18.3+kali+2-test.install.amd64
+.config .kernel* Module.symvers include  usr/src/linux-headers-6.18.3+kali+2-test
+scripts/module.lds                       usr/src/linux-headers-6.18.3+kali+2-test/arch/x86
+arch/x86/include             usr/src/linux-headers-6.18.3+kali+2-test/arch/x86
+========
+.config .kernel* Module.symvers include  usr/src/linux-headers-6.18.5+deb14-test
+scripts/module.lds                       usr/src/linux-headers-6.18.5+deb14-test/arch/x86
+arch/x86/include             usr/src/linux-headers-6.18.5+deb14-test/arch/x86
+>>>>>>>> debian:debian/linux-headers-6.18.5+deb14-test.install.amd64

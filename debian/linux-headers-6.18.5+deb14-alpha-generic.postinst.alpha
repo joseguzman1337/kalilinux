@@ -1,0 +1,11 @@
+#!/bin/sh -e
+
+<<<<<<<< HEAD:debian/linux-headers-6.18.3+kali+2-alpha-generic.postinst.alpha
+version=6.18.3+kali+2-alpha-generic
+========
+version=6.18.5+deb14-alpha-generic
+>>>>>>>> debian:debian/linux-headers-6.18.5+deb14-alpha-generic.postinst.alpha
+
+linux-run-hooks headers postinst $version -- "$@"
+
+exit 0

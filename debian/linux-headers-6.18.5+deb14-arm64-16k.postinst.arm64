@@ -1,0 +1,11 @@
+#!/bin/sh -e
+
+<<<<<<<< HEAD:debian/linux-headers-6.18.3+kali+2-rt-amd64.postinst.amd64
+version=6.18.3+kali+2-rt-amd64
+========
+version=6.18.5+deb14-arm64-16k
+>>>>>>>> debian:debian/linux-headers-6.18.5+deb14-arm64-16k.postinst.arm64
+
+linux-run-hooks headers postinst $version -- "$@"
+
+exit 0

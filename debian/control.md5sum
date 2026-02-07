@@ -1,5 +1,5 @@
 823ad2d08d825ca21fed245a7df44322  debian/bin/gencontrol.py
-7ba2d2cbf1d3735328ff20d544a4c70e  debian/build/version-info
+472ec5fa7e63c1f76dd6ebea0974ab99  debian/build/version-info
 ba2c200f8c43f7ec8d8323561739379a  debian/config/alpha/defines.toml
 fc5d6d91ce75516e35af76f5c5c3c64a  debian/config/amd64/defines.toml
 e9b72d7310f6eefa3ff3cc34ef1f4d59  debian/config/arm64/defines.toml
@@ -66,5 +66,5 @@ c73ff8d70d4ecc4b54c256736f0142ba  debian/templates/signed.image.lintian-override
 edfa7fed4bdffa5ce37dc67af2875954  debian/templates/sourcebin.control.in
 0f283d1deb7af77eba65072e1cd81de3  debian/templates/sourcebin.meta.control.in
 a20d83421667bad21739041d4e743ed1  debian/templates/sourcebin.meta.maintscript.in
-203aabdb4360bbee9e6d0bda0fdf3a1a  debian/templates/tools-unversioned.control.in
+6bc07bd5bfd150b8e7db96ce49978756  debian/templates/tools-unversioned.control.in
 c8aec995cb120db9621c2d7458503e5a  debian/templates/tools-versioned.control.in

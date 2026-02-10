@@ -1,9 +1,0 @@
-<<<<<<<< HEAD:debian/linux-headers-6.18.5+kali-arm64.install.arm64
-.config .kernel* Module.symvers include  usr/src/linux-headers-6.18.5+kali-arm64
-scripts/module.lds                       usr/src/linux-headers-6.18.5+kali-arm64/arch/arm64
-arch/arm64/include             usr/src/linux-headers-6.18.5+kali-arm64/arch/arm64
-========
-.config .kernel* Module.symvers include  usr/src/linux-headers-6.18.9+deb14-s390x
-scripts/module.lds                       usr/src/linux-headers-6.18.9+deb14-s390x/arch/s390
-arch/s390/include             usr/src/linux-headers-6.18.9+deb14-s390x/arch/s390
->>>>>>>> debian:debian/linux-headers-6.18.9+deb14-s390x.install.s390x

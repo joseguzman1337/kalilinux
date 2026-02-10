@@ -1,0 +1,4 @@
+usr/lib/linux-kbuild-6.18.9+kali/scripts                          usr/src/linux-headers-6.18.9+kali-armmp/scripts
+usr/lib/linux-kbuild-6.18.9+kali/tools                            usr/src/linux-headers-6.18.9+kali-armmp/tools
+usr/src/linux-headers-6.18.9+kali-armmp                                               usr/lib/modules/6.18.9+kali-armmp/build
+usr/src/linux-headers-6.18.9+kali-common  usr/lib/modules/6.18.9+kali-armmp/source

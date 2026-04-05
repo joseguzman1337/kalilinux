@@ -28,7 +28,7 @@
 #define CREATE_TRACE_POINTS
 #include "trace.h"
 
-static int catpt_suspend(struct device *dev)
+static int catpt_do_suspend(struct device *dev)
 {
 	struct catpt_dev *cdev = dev_get_drvdata(dev);
 	struct dma_chan *chan;
@@ -70,6 +70,13 @@ release_dma_chan:
 	if (ret)
 		return ret;
 	return catpt_dsp_power_down(cdev);
+}
+
+/* Do not block the system from suspending, recover on resume() if needed. */
+static int catpt_suspend(struct device *dev)
+{
+	catpt_do_suspend(dev);
+	return 0;
 }
 
 static int catpt_resume(struct device *dev)
@@ -114,7 +121,7 @@ static int catpt_runtime_suspend(struct device *dev)
 	}
 	module_put(dev->driver->owner);
 
-	return catpt_suspend(dev);
+	return catpt_do_suspend(dev);
 }
 
 static int catpt_runtime_resume(struct device *dev)
@@ -184,22 +191,25 @@ static int catpt_probe_components(struct catpt_dev *cdev)
 		goto err_boot_fw;
 	}
 
-	ret = catpt_register_board(cdev);
-	if (ret) {
-		dev_err(cdev->dev, "register board failed: %d\n", ret);
-		goto err_reg_board;
-	}
-
 	/* reflect actual ADSP state in pm_runtime */
 	pm_runtime_set_active(cdev->dev);
 
 	pm_runtime_set_autosuspend_delay(cdev->dev, 2000);
 	pm_runtime_use_autosuspend(cdev->dev);
 	pm_runtime_mark_last_busy(cdev->dev);
+	/* Enable PM before spawning child device. See catpt_dai_pcm_new(). */
 	pm_runtime_enable(cdev->dev);
+
+	ret = catpt_register_board(cdev);
+	if (ret) {
+		dev_err(cdev->dev, "register board failed: %d\n", ret);
+		goto err_reg_board;
+	}
+
 	return 0;
 
 err_reg_board:
+	pm_runtime_disable(cdev->dev);
 	snd_soc_unregister_component(cdev->dev);
 err_boot_fw:
 	catpt_dmac_remove(cdev);
@@ -271,7 +281,15 @@ static int catpt_acpi_probe(struct platform_device *pdev)
 	if (IS_ERR(cdev->pci_ba))
 		return PTR_ERR(cdev->pci_ba);
 
-	/* alloc buffer for storing DRAM context during dx transitions */
+	/*
+	 * As per design HOST is responsible for preserving firmware's runtime
+	 * context during D0 -> D3 -> D0 transitions.  Addresses used for DMA
+	 * to/from HOST memory shall be outside the reserved range of 0xFFFxxxxx.
+	 */
+	ret = dma_coerce_mask_and_coherent(cdev->dev, DMA_BIT_MASK(31));
+	if (ret)
+		return ret;
+
 	cdev->dxbuf_vaddr = dmam_alloc_coherent(dev, catpt_dram_size(cdev),
 						&cdev->dxbuf_paddr, GFP_KERNEL);
 	if (!cdev->dxbuf_vaddr)

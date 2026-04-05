@@ -33,7 +33,7 @@
 #include "resource.h"
 #include "include/irq_service_interface.h"
 #include "dcn35_resource.h"
-#include "dml2/dml2_wrapper.h"
+#include "dml2_0/dml2_wrapper.h"
 
 #include "dcn20/dcn20_resource.h"
 #include "dcn30/dcn30_resource.h"
@@ -767,7 +767,6 @@ static const struct dc_debug_options debug_defaults_drv = {
 	.using_dml2 = true,
 	.support_eDP1_5 = true,
 	.enable_hpo_pg_support = false,
-	.enable_legacy_fast_update = true,
 	.enable_single_display_2to1_odm_policy = true,
 	.disable_idle_power_optimizations = false,
 	.dmcub_emulation = false,
@@ -786,6 +785,10 @@ static const struct dc_debug_options debug_defaults_drv = {
 	.static_screen_wait_frames = 2,
 	.disable_timeout = true,
 	.min_disp_clk_khz = 50000,
+};
+
+static const struct dc_check_config config_defaults = {
+	.enable_legacy_fast_update = true,
 };
 
 static const struct dc_panel_config panel_config_defaults = {
@@ -1271,11 +1274,11 @@ static struct stream_encoder *dcn35_stream_encoder_create(
 	int afmt_inst;
 
 	/* Mapping of VPG, AFMT, DME register blocks to DIO block instance */
-	if (eng_id <= ENGINE_ID_DIGF) {
-		vpg_inst = eng_id;
-		afmt_inst = eng_id;
-	} else
+	if (eng_id < 0 || eng_id >= ARRAY_SIZE(stream_enc_regs))
 		return NULL;
+
+	vpg_inst = eng_id;
+	afmt_inst = eng_id;
 
 	enc1 = kzalloc(sizeof(struct dcn10_stream_encoder), GFP_KERNEL);
 	vpg = dcn31_vpg_create(ctx, vpg_inst);
@@ -1946,6 +1949,7 @@ static bool dcn35_resource_construct(
 			dc->caps.vbios_lttpr_aware = true;
 		}
 	}
+	dc->check_config = config_defaults;
 
 	if (dc->ctx->dce_environment == DCE_ENV_PRODUCTION_DRV)
 		dc->debug = debug_defaults_drv;

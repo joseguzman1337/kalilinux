@@ -16,6 +16,7 @@
 #include <linux/minmax.h>
 #include <linux/module.h>
 #include <linux/overflow.h>
+#include <linux/pm_runtime.h>
 #include <linux/regmap.h>
 #include <linux/soundwire/sdw_registers.h>
 #include <linux/string_helpers.h>
@@ -115,50 +116,6 @@ int sdca_asoc_count_component(struct device *dev, struct sdca_function_data *fun
 }
 EXPORT_SYMBOL_NS(sdca_asoc_count_component, "SND_SOC_SDCA");
 
-static const char *get_terminal_name(enum sdca_terminal_type type)
-{
-	switch (type) {
-	case SDCA_TERM_TYPE_LINEIN_STEREO:
-		return SDCA_TERM_TYPE_LINEIN_STEREO_NAME;
-	case SDCA_TERM_TYPE_LINEIN_FRONT_LR:
-		return SDCA_TERM_TYPE_LINEIN_FRONT_LR_NAME;
-	case SDCA_TERM_TYPE_LINEIN_CENTER_LFE:
-		return SDCA_TERM_TYPE_LINEIN_CENTER_LFE_NAME;
-	case SDCA_TERM_TYPE_LINEIN_SURROUND_LR:
-		return SDCA_TERM_TYPE_LINEIN_SURROUND_LR_NAME;
-	case SDCA_TERM_TYPE_LINEIN_REAR_LR:
-		return SDCA_TERM_TYPE_LINEIN_REAR_LR_NAME;
-	case SDCA_TERM_TYPE_LINEOUT_STEREO:
-		return SDCA_TERM_TYPE_LINEOUT_STEREO_NAME;
-	case SDCA_TERM_TYPE_LINEOUT_FRONT_LR:
-		return SDCA_TERM_TYPE_LINEOUT_FRONT_LR_NAME;
-	case SDCA_TERM_TYPE_LINEOUT_CENTER_LFE:
-		return SDCA_TERM_TYPE_LINEOUT_CENTER_LFE_NAME;
-	case SDCA_TERM_TYPE_LINEOUT_SURROUND_LR:
-		return SDCA_TERM_TYPE_LINEOUT_SURROUND_LR_NAME;
-	case SDCA_TERM_TYPE_LINEOUT_REAR_LR:
-		return SDCA_TERM_TYPE_LINEOUT_REAR_LR_NAME;
-	case SDCA_TERM_TYPE_MIC_JACK:
-		return SDCA_TERM_TYPE_MIC_JACK_NAME;
-	case SDCA_TERM_TYPE_STEREO_JACK:
-		return SDCA_TERM_TYPE_STEREO_JACK_NAME;
-	case SDCA_TERM_TYPE_FRONT_LR_JACK:
-		return SDCA_TERM_TYPE_FRONT_LR_JACK_NAME;
-	case SDCA_TERM_TYPE_CENTER_LFE_JACK:
-		return SDCA_TERM_TYPE_CENTER_LFE_JACK_NAME;
-	case SDCA_TERM_TYPE_SURROUND_LR_JACK:
-		return SDCA_TERM_TYPE_SURROUND_LR_JACK_NAME;
-	case SDCA_TERM_TYPE_REAR_LR_JACK:
-		return SDCA_TERM_TYPE_REAR_LR_JACK_NAME;
-	case SDCA_TERM_TYPE_HEADPHONE_JACK:
-		return SDCA_TERM_TYPE_HEADPHONE_JACK_NAME;
-	case SDCA_TERM_TYPE_HEADSET_JACK:
-		return SDCA_TERM_TYPE_HEADSET_JACK_NAME;
-	default:
-		return NULL;
-	}
-}
-
 static int entity_early_parse_ge(struct device *dev,
 				 struct sdca_function_data *function,
 				 struct sdca_entity *entity)
@@ -217,7 +174,7 @@ static int entity_early_parse_ge(struct device *dev,
 		type = sdca_range(range, SDCA_SELECTED_MODE_TERM_TYPE, i);
 
 		values[i + 3] = sdca_range(range, SDCA_SELECTED_MODE_INDEX, i);
-		texts[i + 3] = get_terminal_name(type);
+		texts[i + 3] = sdca_find_terminal_name(type);
 		if (!texts[i + 3]) {
 			dev_err(dev, "%s: unrecognised terminal type: %#x\n",
 				entity->label, type);
@@ -337,7 +294,7 @@ static int entity_parse_ot(struct device *dev,
 static int entity_pde_event(struct snd_soc_dapm_widget *widget,
 			    struct snd_kcontrol *kctl, int event)
 {
-	struct snd_soc_component *component = widget->dapm->component;
+	struct snd_soc_component *component = snd_soc_dapm_to_component(widget->dapm);
 	struct sdca_entity *entity = widget->priv;
 	static const int polls = 100;
 	unsigned int reg, val;
@@ -499,7 +456,7 @@ static int entity_parse_su_device(struct device *dev,
 				return -EINVAL;
 			}
 
-			add_route(route, entity->label, get_terminal_name(term),
+			add_route(route, entity->label, sdca_find_terminal_name(term),
 				  entity->sources[affected->val - 1]->label);
 		}
 	}
@@ -655,7 +612,7 @@ static int entity_parse_mu(struct device *dev,
 static int entity_cs_event(struct snd_soc_dapm_widget *widget,
 			   struct snd_kcontrol *kctl, int event)
 {
-	struct snd_soc_component *component = widget->dapm->component;
+	struct snd_soc_component *component = snd_soc_dapm_to_component(widget->dapm);
 	struct sdca_entity *entity = widget->priv;
 
 	if (!component)
@@ -836,6 +793,48 @@ static int control_limit_kctl(struct device *dev,
 	return 0;
 }
 
+static int volatile_get_volsw(struct snd_kcontrol *kcontrol,
+			      struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
+	struct device *dev = component->dev;
+	int ret;
+
+	ret = pm_runtime_resume_and_get(dev);
+	if (ret < 0) {
+		dev_err(dev, "failed to resume reading %s: %d\n",
+			kcontrol->id.name, ret);
+		return ret;
+	}
+
+	ret = snd_soc_get_volsw(kcontrol, ucontrol);
+
+	pm_runtime_put(dev);
+
+	return ret;
+}
+
+static int volatile_put_volsw(struct snd_kcontrol *kcontrol,
+			      struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
+	struct device *dev = component->dev;
+	int ret;
+
+	ret = pm_runtime_resume_and_get(dev);
+	if (ret < 0) {
+		dev_err(dev, "failed to resume writing %s: %d\n",
+			kcontrol->id.name, ret);
+		return ret;
+	}
+
+	ret = snd_soc_put_volsw(kcontrol, ucontrol);
+
+	pm_runtime_put(dev);
+
+	return ret;
+}
+
 static int populate_control(struct device *dev,
 			    struct sdca_function_data *function,
 			    struct sdca_entity *entity,
@@ -886,12 +885,20 @@ static int populate_control(struct device *dev,
 	mc->min = 0;
 	mc->max = clamp((0x1ull << control->nbits) - 1, 0, type_max(mc->max));
 
+	if (SDCA_CTL_TYPE(entity->type, control->sel) == SDCA_CTL_TYPE_S(FU, MUTE))
+		mc->invert = true;
+
 	(*kctl)->name = control_name;
 	(*kctl)->private_value = (unsigned long)mc;
 	(*kctl)->iface = SNDRV_CTL_ELEM_IFACE_MIXER;
 	(*kctl)->info = snd_soc_info_volsw;
-	(*kctl)->get = snd_soc_get_volsw;
-	(*kctl)->put = snd_soc_put_volsw;
+	if (control->is_volatile) {
+		(*kctl)->get = volatile_get_volsw;
+		(*kctl)->put = volatile_put_volsw;
+	} else {
+		(*kctl)->get = snd_soc_get_volsw;
+		(*kctl)->put = snd_soc_put_volsw;
+	}
 
 	if (readonly_control(control))
 		(*kctl)->access = SNDRV_CTL_ELEM_ACCESS_READ;
@@ -1519,7 +1526,7 @@ static int set_usage(struct device *dev, struct regmap *regmap,
 		unsigned int rate = sdca_range(range, SDCA_USAGE_SAMPLE_RATE, i);
 		unsigned int width = sdca_range(range, SDCA_USAGE_SAMPLE_WIDTH, i);
 
-		if ((!rate || rate == target_rate) && width == target_width) {
+		if ((!rate || rate == target_rate) && (!width || width == target_width)) {
 			unsigned int usage = sdca_range(range, SDCA_USAGE_NUMBER, i);
 			unsigned int reg = SDW_SDCA_CTL(function->desc->adr,
 							entity->id, sel, 0);

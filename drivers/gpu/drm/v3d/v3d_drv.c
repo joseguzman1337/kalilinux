@@ -25,6 +25,7 @@
 
 #include <drm/drm_drv.h>
 #include <drm/drm_managed.h>
+#include <drm/drm_print.h>
 #include <uapi/drm/v3d_drm.h>
 
 #include "v3d_drv.h"
@@ -376,6 +377,8 @@ static int v3d_platform_drm_probe(struct platform_device *pdev)
 	ret = dma_set_mask_and_coherent(dev, mask);
 	if (ret)
 		goto clk_disable;
+
+	dma_set_max_seg_size(&pdev->dev, UINT_MAX);
 
 	v3d->va_width = 30 + V3D_GET_FIELD(mmu_debug, V3D_MMU_VA_WIDTH);
 

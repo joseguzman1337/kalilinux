@@ -1345,6 +1345,8 @@ struct vc_data *vc_deallocate(unsigned int currcons)
 			kfree(vc->vc_saved_screen);
 			vc->vc_saved_screen = NULL;
 		}
+		vc_uniscr_free(vc->vc_saved_uni_lines);
+		vc->vc_saved_uni_lines = NULL;
 	}
 	return vc;
 }
@@ -1890,6 +1892,8 @@ static void enter_alt_screen(struct vc_data *vc)
 	vc->vc_saved_screen = kmemdup((u16 *)vc->vc_origin, size, GFP_KERNEL);
 	if (vc->vc_saved_screen == NULL)
 		return;
+	vc->vc_saved_uni_lines = vc->vc_uni_lines;
+	vc->vc_uni_lines = NULL;
 	vc->vc_saved_rows = vc->vc_rows;
 	vc->vc_saved_cols = vc->vc_cols;
 	save_cur(vc);
@@ -1911,6 +1915,8 @@ static void leave_alt_screen(struct vc_data *vc)
 		dest = ((u16 *)vc->vc_origin) + r * vc->vc_cols;
 		memcpy(dest, src, 2 * cols);
 	}
+	vc_uniscr_set(vc, vc->vc_saved_uni_lines);
+	vc->vc_saved_uni_lines = NULL;
 	restore_cur(vc);
 	/* Update the entire screen */
 	if (con_should_update(vc))
@@ -2233,6 +2239,8 @@ static void reset_terminal(struct vc_data *vc, int do_clear)
 	if (vc->vc_saved_screen != NULL) {
 		kfree(vc->vc_saved_screen);
 		vc->vc_saved_screen = NULL;
+		vc_uniscr_free(vc->vc_saved_uni_lines);
+		vc->vc_saved_uni_lines = NULL;
 		vc->vc_saved_rows = 0;
 		vc->vc_saved_cols = 0;
 	}
@@ -4862,7 +4870,7 @@ static int con_font_get(struct vc_data *vc, struct console_font_op *op)
 			return ret;
 	}
 
-	c = (font.width+7)/8 * vpitch * font.charcount;
+	c = DIV_ROUND_UP(font.width, 8) * vpitch * font.charcount;
 
 	if (op->data && font.charcount > op->charcount)
 		return -ENOSPC;
@@ -4894,7 +4902,7 @@ static int con_font_set(struct vc_data *vc, const struct console_font_op *op)
 		return -EINVAL;
 	if (vpitch < op->height)
 		return -EINVAL;
-	size = (op->width+7)/8 * vpitch * op->charcount;
+	size = DIV_ROUND_UP(op->width, 8) * vpitch * op->charcount;
 	if (size > max_font_size)
 		return -ENOSPC;
 

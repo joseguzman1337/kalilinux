@@ -117,6 +117,8 @@ enum wq_internal_consts {
 	MAYDAY_INTERVAL		= HZ / 10,	/* and then every 100ms */
 	CREATE_COOLDOWN		= HZ,		/* time to breath after fail */
 
+	RESCUER_BATCH		= 16,		/* process items per turn */
+
 	/*
 	 * Rescue workers are used only on emergencies and shared by
 	 * all cpus.  Give MIN_NICE.
@@ -286,6 +288,7 @@ struct pool_workqueue {
 	struct list_head	pending_node;	/* LN: node on wq_node_nr_active->pending_pwqs */
 	struct list_head	pwqs_node;	/* WR: node on wq->pwqs */
 	struct list_head	mayday_node;	/* MD: node on wq->maydays */
+	struct work_struct	mayday_cursor;	/* L: cursor on pool->worklist */
 
 	u64			stats[PWQ_NR_STATS];
 
@@ -540,12 +543,6 @@ static void show_one_worker_pool(struct worker_pool *pool);
 	RCU_LOCKDEP_WARN(!rcu_read_lock_any_held() &&			\
 			 !lockdep_is_held(&wq_pool_mutex),		\
 			 "RCU or wq_pool_mutex should be held")
-
-#define assert_rcu_or_wq_mutex_or_pool_mutex(wq)			\
-	RCU_LOCKDEP_WARN(!rcu_read_lock_any_held() &&			\
-			 !lockdep_is_held(&wq->mutex) &&		\
-			 !lockdep_is_held(&wq_pool_mutex),		\
-			 "RCU, wq->mutex or wq_pool_mutex should be held")
 
 #define for_each_bh_worker_pool(pool, cpu)				\
 	for ((pool) = &per_cpu(bh_worker_pools, cpu)[0];		\
@@ -1126,6 +1123,12 @@ static struct worker *find_worker_executing_work(struct worker_pool *pool,
 	return NULL;
 }
 
+static void mayday_cursor_func(struct work_struct *work)
+{
+	/* should not be processed, only for marking position */
+	BUG();
+}
+
 /**
  * move_linked_works - move linked works to a list
  * @work: start of series of works to be scheduled
@@ -1187,6 +1190,16 @@ static bool assign_work(struct work_struct *work, struct worker *worker,
 	struct worker *collision;
 
 	lockdep_assert_held(&pool->lock);
+
+	/* The cursor work should not be processed */
+	if (unlikely(work->func == mayday_cursor_func)) {
+		/* only worker_thread() can possibly take this branch */
+		WARN_ON_ONCE(worker->rescue_wq);
+		if (nextp)
+			*nextp = list_next_entry(work, entry);
+		list_del_init(&work->entry);
+		return false;
+	}
 
 	/*
 	 * A single work shouldn't be executed concurrently by multiple workers.
@@ -3443,6 +3456,35 @@ sleep:
 	goto woke_up;
 }
 
+static bool assign_rescuer_work(struct pool_workqueue *pwq, struct worker *rescuer)
+{
+	struct worker_pool *pool = pwq->pool;
+	struct work_struct *cursor = &pwq->mayday_cursor;
+	struct work_struct *work, *n;
+
+	/* need rescue? */
+	if (!pwq->nr_active || !need_to_create_worker(pool))
+		return false;
+
+	/* search from the start or cursor if available */
+	if (list_empty(&cursor->entry))
+		work = list_first_entry(&pool->worklist, struct work_struct, entry);
+	else
+		work = list_next_entry(cursor, entry);
+
+	/* find the next work item to rescue */
+	list_for_each_entry_safe_from(work, n, &pool->worklist, entry) {
+		if (get_work_pwq(work) == pwq && assign_work(work, rescuer, &n)) {
+			pwq->stats[PWQ_STAT_RESCUED]++;
+			/* put the cursor for next search */
+			list_move_tail(&cursor->entry, &n->entry);
+			return true;
+		}
+	}
+
+	return false;
+}
+
 /**
  * rescuer_thread - the rescuer thread function
  * @__rescuer: self
@@ -3497,7 +3539,7 @@ repeat:
 		struct pool_workqueue *pwq = list_first_entry(&wq->maydays,
 					struct pool_workqueue, mayday_node);
 		struct worker_pool *pool = pwq->pool;
-		struct work_struct *work, *n;
+		unsigned int count = 0;
 
 		__set_current_state(TASK_RUNNING);
 		list_del_init(&pwq->mayday_node);
@@ -3508,42 +3550,34 @@ repeat:
 
 		raw_spin_lock_irq(&pool->lock);
 
-		/*
-		 * Slurp in all works issued via this workqueue and
-		 * process'em.
-		 */
 		WARN_ON_ONCE(!list_empty(&rescuer->scheduled));
-		list_for_each_entry_safe(work, n, &pool->worklist, entry) {
-			if (get_work_pwq(work) == pwq &&
-			    assign_work(work, rescuer, &n))
-				pwq->stats[PWQ_STAT_RESCUED]++;
-		}
 
-		if (!list_empty(&rescuer->scheduled)) {
+		while (assign_rescuer_work(pwq, rescuer)) {
 			process_scheduled_works(rescuer);
 
 			/*
-			 * The above execution of rescued work items could
-			 * have created more to rescue through
-			 * pwq_activate_first_inactive() or chained
-			 * queueing.  Let's put @pwq back on mayday list so
-			 * that such back-to-back work items, which may be
-			 * being used to relieve memory pressure, don't
-			 * incur MAYDAY_INTERVAL delay inbetween.
+			 * If the per-turn work item limit is reached and other
+			 * PWQs are in mayday, requeue mayday for this PWQ and
+			 * let the rescuer handle the other PWQs first.
 			 */
-			if (pwq->nr_active && need_to_create_worker(pool)) {
+			if (++count > RESCUER_BATCH && !list_empty(&pwq->wq->maydays) &&
+			    pwq->nr_active && need_to_create_worker(pool)) {
 				raw_spin_lock(&wq_mayday_lock);
 				/*
-				 * Queue iff we aren't racing destruction
-				 * and somebody else hasn't queued it already.
+				 * Queue iff somebody else hasn't queued it already.
 				 */
-				if (wq->rescuer && list_empty(&pwq->mayday_node)) {
+				if (list_empty(&pwq->mayday_node)) {
 					get_pwq(pwq);
 					list_add_tail(&pwq->mayday_node, &wq->maydays);
 				}
 				raw_spin_unlock(&wq_mayday_lock);
+				break;
 			}
 		}
+
+		/* The cursor can not be left behind without the rescuer watching it. */
+		if (!list_empty(&pwq->mayday_cursor.entry) && list_empty(&pwq->mayday_node))
+			list_del_init(&pwq->mayday_cursor.entry);
 
 		/*
 		 * Leave this pool. Notify regular workers; otherwise, we end up
@@ -5163,6 +5197,19 @@ static void init_pwq(struct pool_workqueue *pwq, struct workqueue_struct *wq,
 	INIT_LIST_HEAD(&pwq->pwqs_node);
 	INIT_LIST_HEAD(&pwq->mayday_node);
 	kthread_init_work(&pwq->release_work, pwq_release_workfn);
+
+	/*
+	 * Set the dummy cursor work with valid function and get_work_pwq().
+	 *
+	 * The cursor work should only be in the pwq->pool->worklist, and
+	 * should not be treated as a processable work item.
+	 *
+	 * WORK_STRUCT_PENDING and WORK_STRUCT_INACTIVE just make it less
+	 * surprise for kernel debugging tools and reviewers.
+	 */
+	INIT_WORK(&pwq->mayday_cursor, mayday_cursor_func);
+	atomic_long_set(&pwq->mayday_cursor.data, (unsigned long)pwq |
+			WORK_STRUCT_PENDING | WORK_STRUCT_PWQ | WORK_STRUCT_INACTIVE);
 }
 
 /* sync @pwq with the current state of its associated wq and link it */
@@ -5375,11 +5422,6 @@ static void apply_wqattrs_commit(struct apply_wqattrs_ctx *ctx)
 
 	/* update node_nr_active->max */
 	wq_update_node_max_active(ctx->wq, -1);
-
-	/* rescuer needs to respect wq cpumask changes */
-	if (ctx->wq->rescuer)
-		set_cpus_allowed_ptr(ctx->wq->rescuer->task,
-				     unbound_effective_cpumask(ctx->wq));
 
 	mutex_unlock(&ctx->wq->mutex);
 }
@@ -5614,10 +5656,13 @@ static int init_rescuer(struct workqueue_struct *wq)
 	}
 
 	wq->rescuer = rescuer;
-	if (wq->flags & WQ_UNBOUND)
-		kthread_bind_mask(rescuer->task, unbound_effective_cpumask(wq));
+
+	/* initial cpumask is consistent with the detached rescuer and unbind_worker() */
+	if (cpumask_intersects(wq_unbound_cpumask, cpu_active_mask))
+		kthread_bind_mask(rescuer->task, wq_unbound_cpumask);
 	else
 		kthread_bind_mask(rescuer->task, cpu_possible_mask);
+
 	wake_up_process(rescuer->task);
 
 	return 0;
@@ -5902,16 +5947,10 @@ void destroy_workqueue(struct workqueue_struct *wq)
 
 	/* kill rescuer, if sanity checks fail, leave it w/o rescuer */
 	if (wq->rescuer) {
-		struct worker *rescuer = wq->rescuer;
-
-		/* this prevents new queueing */
-		raw_spin_lock_irq(&wq_mayday_lock);
-		wq->rescuer = NULL;
-		raw_spin_unlock_irq(&wq_mayday_lock);
-
 		/* rescuer will empty maydays list before exiting */
-		kthread_stop(rescuer->task);
-		kfree(rescuer);
+		kthread_stop(wq->rescuer->task);
+		kfree(wq->rescuer);
+		wq->rescuer = NULL;
 	}
 
 	/*
@@ -6215,7 +6254,7 @@ static void pr_cont_worker_id(struct worker *worker)
 {
 	struct worker_pool *pool = worker->pool;
 
-	if (pool->flags & WQ_BH)
+	if (pool->flags & POOL_BH)
 		pr_cont("bh%s",
 			pool->attrs->nice == HIGHPRI_NICE_LEVEL ? "-hi" : "");
 	else
@@ -6937,8 +6976,26 @@ static int workqueue_apply_unbound_cpumask(const cpumask_var_t unbound_cpumask)
 	}
 
 	if (!ret) {
+		int cpu;
+		struct worker_pool *pool;
+		struct worker *worker;
+
 		mutex_lock(&wq_pool_attach_mutex);
 		cpumask_copy(wq_unbound_cpumask, unbound_cpumask);
+		/* rescuer needs to respect cpumask changes when it is not attached */
+		list_for_each_entry(wq, &workqueues, list) {
+			if (wq->rescuer && !wq->rescuer->pool)
+				unbind_worker(wq->rescuer);
+		}
+		/* DISASSOCIATED worker needs to respect wq_unbound_cpumask */
+		for_each_possible_cpu(cpu) {
+			for_each_cpu_worker_pool(pool, cpu) {
+				if (!(pool->flags & POOL_DISASSOCIATED))
+					continue;
+				for_each_pool_worker(worker, pool)
+					unbind_worker(worker);
+			}
+		}
 		mutex_unlock(&wq_pool_attach_mutex);
 	}
 	return ret;

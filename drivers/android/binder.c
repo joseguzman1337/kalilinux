@@ -4523,7 +4523,7 @@ static int binder_thread_write(struct binder_proc *proc,
 				}
 			}
 			binder_debug(BINDER_DEBUG_DEAD_BINDER,
-				     "%d:%d BC_DEAD_BINDER_DONE %016llx found %pK\n",
+				     "%d:%d BC_DEAD_BINDER_DONE %016llx found %p\n",
 				     proc->pid, thread->pid, (u64)cookie,
 				     death);
 			if (death == NULL) {
@@ -4682,6 +4682,8 @@ static int binder_wait_for_work(struct binder_thread *thread,
  *
  * If we fail to allocate an fd, skip the install and release
  * any fds that have already been allocated.
+ *
+ * Return: 0 on success, a negative errno code on failure.
  */
 static int binder_apply_fd_fixups(struct binder_proc *proc,
 				  struct binder_transaction *t)

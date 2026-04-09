@@ -23,7 +23,7 @@ from debian_linux.config_v2 import (
 from debian_linux.dataclasses_deb822 import read_deb822, write_deb822
 from debian_linux.debian import \
     PackageBuildprofile, \
-    PackageRelationEntry, PackageRelationGroup, \
+    PackageRelation, PackageRelationEntry, PackageRelationGroup, \
     VersionLinux, BinaryPackage
 from debian_linux.gencontrol import Gencontrol as Base, PackagesBundle, \
     MakeFlags
@@ -376,20 +376,25 @@ linux-signed-{vars['arch']} (@signedtemplate_sourceversion@) {dist}; urgency={ur
         vars.setdefault('desc', '')
 
         packages_own.extend(self.bundle.add('base', ruleid, makeflags, vars, arch=arch))
+        packages_own.extend(self.bundle.add('modules', ruleid, makeflags, vars, arch=arch))
 
         if build_signed:
-            packages_image_unsigned = (
-                self.bundle.add('image-unsigned', ruleid, makeflags, vars, arch=arch)
+            packages_binary_unsigned = (
+                self.bundle.add('binary-unsigned', ruleid, makeflags, vars, arch=arch)
             )
-            packages_image = packages_image_unsigned[:]
-            packages_image.extend(
-                bundle_signed.add('signed.image', ruleid, makeflags, vars, arch=arch)
+            packages_binary = packages_binary_unsigned[:]
+            packages_binary.extend(
+                bundle_signed.add('signed.binary', ruleid, makeflags, vars, arch=arch)
             )
 
         else:
-            packages_image = packages_image_unsigned = (
-                bundle_signed.add('image', ruleid, makeflags, vars, arch=arch)
+            packages_binary = packages_binary_unsigned = (
+                bundle_signed.add('binary', ruleid, makeflags, vars, arch=arch)
             )
+
+        packages_image = (
+            bundle_signed.add('image', ruleid, makeflags, vars, arch=arch)
+        )
 
         for field in ('Depends', 'Provides', 'Suggests', 'Recommends',
                       'Conflicts', 'Breaks'):
@@ -420,6 +425,7 @@ linux-signed-{vars['arch']} (@signedtemplate_sourceversion@) {dist}; urgency={ur
                     desc.append_short(config.description.short[part])
 
         packages_headers[0].depends.merge([relation_c_compiler_host])
+        packages_own.extend(packages_binary)
         packages_own.extend(packages_image)
         packages_own.extend(packages_headers)
 
@@ -462,9 +468,10 @@ linux-signed-{vars['arch']} (@signedtemplate_sourceversion@) {dist}; urgency={ur
             )
 
         if build_installer:
-            packages_own.extend(
-                bundle_signed.add('image-di', ruleid, makeflags, vars, arch=arch)
-            )
+            packages_base_di = self.bundle.add('base-di', ruleid, makeflags, vars, arch=arch) \
+                    + bundle_signed.add('binary-di', ruleid, makeflags, vars, arch=arch)
+            packages_own.extend(packages_base_di)
+            depends_base_di = PackageRelation(i.name for i in packages_base_di)
 
         # In a quick build, only build the test flavour.
         if config.defs_flavour.is_test:
@@ -475,10 +482,10 @@ linux-signed-{vars['arch']} (@signedtemplate_sourceversion@) {dist}; urgency={ur
                 package.build_profiles[0].neg.add('pkg.linux.quick')
 
         tests_control_image = list(
-            self.templates.get_tests_control('image.tests-control', vars))
+            self.templates.get_tests_control('binary.tests-control', vars))
         for c in tests_control_image:
             c.depends.extend(
-                [i.name for i in packages_image_unsigned]
+                [i.name for i in packages_binary_unsigned]
             )
 
         tests_control_headers = list(
@@ -486,7 +493,7 @@ linux-signed-{vars['arch']} (@signedtemplate_sourceversion@) {dist}; urgency={ur
         for c in tests_control_headers:
             c.depends.extend(
                 [i.name for i in packages_headers] +
-                [i.name for i in packages_image_unsigned]
+                [i.name for i in packages_binary_unsigned]
             )
 
         self.tests_control.extend(tests_control_image)
@@ -543,6 +550,9 @@ linux-signed-{vars['arch']} (@signedtemplate_sourceversion@) {dist}; urgency={ur
             udeb_packages = [
                 dataclasses.replace(
                     package_base,
+                    # kernel-wedge does not support versioned extra packages,
+                    # so inject the base dependency here.
+                    depends=PackageRelation(depends_base_di + package_base.depends),
                     # kernel-wedge currently chokes on Build-Profiles so add it now
                     build_profiles=PackageBuildprofile.parse(
                         '<!noudeb !pkg.linux.nokernel !pkg.linux.quick>',
@@ -566,13 +576,15 @@ linux-signed-{vars['arch']} (@signedtemplate_sourceversion@) {dist}; urgency={ur
             # All Debian versions must have a distinct ABI version.
             # So if this is not the first Debian version with its
             # upstream version and Debian release, distinguish it by
-            # adding a serial number suffix.
+            # adding a serial number suffix.  This needs to be sorted
+            # higher than the flavour suffix by both 'sort -V' and
+            # 'linux-version sort'.
             n = sum(1
                     for entry in self.changelog
                     if (entry.version.linux_version_full == version.linux_version_full
                         and self.debianrelease.name_regex.fullmatch(entry.distribution)))
             if n > 1:
-                self.abiname += f'+{n-1}'
+                self.abiname += f'.{n-1}'
         else:
             self.abiname = version.linux_version + self.debianrelease.abi_suffix
 

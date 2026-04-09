@@ -16,6 +16,7 @@ static void idxd_cmd_exec(struct idxd_device *idxd, int cmd_code, u32 operand,
 			  u32 *status);
 static void idxd_device_wqs_clear_state(struct idxd_device *idxd);
 static void idxd_wq_disable_cleanup(struct idxd_wq *wq);
+static int idxd_wq_config_write(struct idxd_wq *wq);
 
 /* Interrupt control bits */
 void idxd_unmask_error_interrupts(struct idxd_device *idxd)
@@ -174,6 +175,7 @@ void idxd_wq_free_resources(struct idxd_wq *wq)
 	free_descs(wq);
 	dma_free_coherent(dev, wq->compls_size, wq->compls, wq->compls_addr);
 	sbitmap_queue_free(&wq->sbq);
+	wq->type = IDXD_WQT_NONE;
 }
 EXPORT_SYMBOL_NS_GPL(idxd_wq_free_resources, "IDXD");
 
@@ -215,13 +217,27 @@ int idxd_wq_disable(struct idxd_wq *wq, bool reset_config)
 		return 0;
 	}
 
+	/*
+	 * Disable WQ does not drain address translations, if WQ attributes are
+	 * changed before translations are drained, pending translations can
+	 * be issued using updated WQ attibutes, resulting in invalid
+	 * translations being cached in the device translation cache.
+	 *
+	 * To make sure pending translations are drained before WQ
+	 * attributes are changed, we use a WQ Drain followed by WQ Reset and
+	 * then restore the WQ configuration.
+	 */
+	idxd_wq_drain(wq);
+
 	operand = BIT(wq->id % 16) | ((wq->id / 16) << 16);
-	idxd_cmd_exec(idxd, IDXD_CMD_DISABLE_WQ, operand, &status);
+	idxd_cmd_exec(idxd, IDXD_CMD_RESET_WQ, operand, &status);
 
 	if (status != IDXD_CMDSTS_SUCCESS) {
-		dev_dbg(dev, "WQ disable failed: %#x\n", status);
+		dev_dbg(dev, "WQ reset failed: %#x\n", status);
 		return -ENXIO;
 	}
+
+	idxd_wq_config_write(wq);
 
 	if (reset_config)
 		idxd_wq_disable_cleanup(wq);
@@ -367,7 +383,6 @@ static void idxd_wq_disable_cleanup(struct idxd_wq *wq)
 	lockdep_assert_held(&wq->wq_lock);
 	wq->state = IDXD_WQ_DISABLED;
 	memset(wq->wqcfg, 0, idxd->wqcfg_size);
-	wq->type = IDXD_WQT_NONE;
 	wq->threshold = 0;
 	wq->priority = 0;
 	wq->enqcmds_retries = IDXD_ENQCMDS_RETRIES;
@@ -815,8 +830,7 @@ static void idxd_device_evl_free(struct idxd_device *idxd)
 	struct device *dev = &idxd->pdev->dev;
 	struct idxd_evl *evl = idxd->evl;
 
-	gencfg.bits = ioread32(idxd->reg_base + IDXD_GENCFG_OFFSET);
-	if (!gencfg.evl_en)
+	if (!evl)
 		return;
 
 	mutex_lock(&evl->lock);
@@ -1513,7 +1527,6 @@ void idxd_drv_disable_wq(struct idxd_wq *wq)
 	idxd_wq_reset(wq);
 	idxd_wq_free_resources(wq);
 	percpu_ref_exit(&wq->wq_active);
-	wq->type = IDXD_WQT_NONE;
 	wq->client_count = 0;
 }
 EXPORT_SYMBOL_NS_GPL(idxd_drv_disable_wq, "IDXD");

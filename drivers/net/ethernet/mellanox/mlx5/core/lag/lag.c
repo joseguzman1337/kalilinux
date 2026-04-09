@@ -1419,10 +1419,12 @@ static void mlx5_lag_unregister_hca_devcom_comp(struct mlx5_core_dev *dev)
 static int mlx5_lag_register_hca_devcom_comp(struct mlx5_core_dev *dev)
 {
 	struct mlx5_devcom_match_attr attr = {
-		.key.val = mlx5_query_nic_system_image_guid(dev),
 		.flags = MLX5_DEVCOM_MATCH_FLAGS_NS,
 		.net = mlx5_core_net(dev),
 	};
+	u8 len __always_unused;
+
+	mlx5_query_nic_sw_system_image_guid(dev, attr.key.buf, &len);
 
 	/* This component is use to sync adding core_dev to lag_dev and to sync
 	 * changes of mlx5_adev_devices between LAG layer and other layers.
@@ -1652,8 +1654,12 @@ void mlx5_lag_disable_change(struct mlx5_core_dev *dev)
 	mutex_lock(&ldev->lock);
 
 	ldev->mode_changes_in_progress++;
-	if (__mlx5_lag_is_active(ldev))
-		mlx5_disable_lag(ldev);
+	if (__mlx5_lag_is_active(ldev)) {
+		if (ldev->mode == MLX5_LAG_MODE_MPESW)
+			mlx5_lag_disable_mpesw(ldev);
+		else
+			mlx5_disable_lag(ldev);
+	}
 
 	mutex_unlock(&ldev->lock);
 	mlx5_devcom_comp_unlock(dev->priv.hca_devcom_comp);

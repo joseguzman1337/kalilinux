@@ -2459,6 +2459,16 @@ spi_nor_spimem_adjust_hwcaps(struct spi_nor *nor, u32 *hwcaps)
 					    &params->page_programs[ppidx]))
 			*hwcaps &= ~BIT(cap);
 	}
+
+	/* Some SPI controllers might not support CR read opcode. */
+	if (!(nor->flags & SNOR_F_NO_READ_CR)) {
+		struct spi_mem_op op = SPI_NOR_RDCR_OP(nor->bouncebuf);
+
+		spi_nor_spimem_setup_op(nor, &op, nor->reg_proto);
+
+		if (!spi_mem_supports_op(nor->spimem, &op))
+			nor->flags |= SNOR_F_NO_READ_CR;
+	}
 }
 
 /**

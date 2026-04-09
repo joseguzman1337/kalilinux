@@ -688,16 +688,22 @@ skip_ring_stats:
 				buf[j] = *(rx_port_stats_ext + n);
 			}
 			for (i = 0; i < 8; i++, j++) {
-				long n = bnxt_tx_bytes_pri_arr[i].base_off +
-					 bp->pri2cos_idx[i];
+				u8 cos_idx = bp->pri2cos_idx[i];
+				long n;
 
+				n = bnxt_tx_bytes_pri_arr[i].base_off + cos_idx;
 				buf[j] = *(tx_port_stats_ext + n);
+				if (bp->cos0_cos1_shared && !cos_idx)
+					buf[j] += *(tx_port_stats_ext + n + 1);
 			}
 			for (i = 0; i < 8; i++, j++) {
-				long n = bnxt_tx_pkts_pri_arr[i].base_off +
-					 bp->pri2cos_idx[i];
+				u8 cos_idx = bp->pri2cos_idx[i];
+				long n;
 
+				n = bnxt_tx_pkts_pri_arr[i].base_off + cos_idx;
 				buf[j] = *(tx_port_stats_ext + n);
+				if (bp->cos0_cos1_shared && !cos_idx)
+					buf[j] += *(tx_port_stats_ext + n + 1);
 			}
 		}
 	}
@@ -973,8 +979,8 @@ static int bnxt_set_channels(struct net_device *dev,
 
 	if (bnxt_get_nr_rss_ctxs(bp, req_rx_rings) !=
 	    bnxt_get_nr_rss_ctxs(bp, bp->rx_nr_rings) &&
-	    netif_is_rxfh_configured(dev)) {
-		netdev_warn(dev, "RSS table size change required, RSS table entries must be default to proceed\n");
+	    (netif_is_rxfh_configured(dev) || bp->num_rss_ctx)) {
+		netdev_warn(dev, "RSS table size change required, RSS table entries must be default (with no additional RSS contexts present) to proceed\n");
 		return -EINVAL;
 	}
 
@@ -1340,16 +1346,17 @@ static int bnxt_add_ntuple_cls_rule(struct bnxt *bp,
 	struct bnxt_l2_filter *l2_fltr;
 	struct bnxt_flow_masks *fmasks;
 	struct flow_keys *fkeys;
-	u32 idx, ring;
+	u32 idx;
 	int rc;
-	u8 vf;
 
 	if (!bp->vnic_info)
 		return -EAGAIN;
 
-	vf = ethtool_get_flow_spec_ring_vf(fs->ring_cookie);
-	ring = ethtool_get_flow_spec_ring(fs->ring_cookie);
-	if ((fs->flow_type & (FLOW_MAC_EXT | FLOW_EXT)) || vf)
+	if (fs->flow_type & (FLOW_MAC_EXT | FLOW_EXT))
+		return -EOPNOTSUPP;
+
+	if (fs->ring_cookie != RX_CLS_FLOW_DISC &&
+	    ethtool_get_flow_spec_ring_vf(fs->ring_cookie))
 		return -EOPNOTSUPP;
 
 	if (flow_type == IP_USER_FLOW) {
@@ -1475,7 +1482,7 @@ static int bnxt_add_ntuple_cls_rule(struct bnxt *bp,
 	if (fs->ring_cookie == RX_CLS_FLOW_DISC)
 		new_fltr->base.flags |= BNXT_ACT_DROP;
 	else
-		new_fltr->base.rxq = ring;
+		new_fltr->base.rxq = ethtool_get_flow_spec_ring(fs->ring_cookie);
 	__set_bit(BNXT_FLTR_VALID, &new_fltr->base.state);
 	rc = bnxt_insert_ntp_filter(bp, new_fltr, idx);
 	if (!rc) {
@@ -1764,6 +1771,13 @@ static int bnxt_set_rxfh_fields(struct net_device *dev,
 	return rc;
 }
 
+static u32 bnxt_get_rx_ring_count(struct net_device *dev)
+{
+	struct bnxt *bp = netdev_priv(dev);
+
+	return bp->rx_nr_rings;
+}
+
 static int bnxt_get_rxnfc(struct net_device *dev, struct ethtool_rxnfc *cmd,
 			  u32 *rule_locs)
 {
@@ -1771,10 +1785,6 @@ static int bnxt_get_rxnfc(struct net_device *dev, struct ethtool_rxnfc *cmd,
 	int rc = 0;
 
 	switch (cmd->cmd) {
-	case ETHTOOL_GRXRINGS:
-		cmd->data = bp->rx_nr_rings;
-		break;
-
 	case ETHTOOL_GRXCLSRLCNT:
 		cmd->rule_cnt = bp->ntp_fltr_count;
 		cmd->data = bp->max_fltr | RX_CLS_LOC_SPECIAL;
@@ -4617,6 +4627,11 @@ static int bnxt_get_module_status(struct bnxt *bp, struct netlink_ext_ack *extac
 	    PORT_PHY_QCFG_RESP_MODULE_STATUS_WARNINGMSG)
 		return 0;
 
+	if (bp->link_info.phy_type == PORT_PHY_QCFG_RESP_PHY_TYPE_BASET ||
+	    bp->link_info.phy_type == PORT_PHY_QCFG_RESP_PHY_TYPE_BASETE){
+		NL_SET_ERR_MSG_MOD(extack, "Operation not supported as PHY type is Base-T");
+		return -EOPNOTSUPP;
+	}
 	switch (bp->link_info.module_status) {
 	case PORT_PHY_QCFG_RESP_MODULE_STATUS_PWRDOWN:
 		NL_SET_ERR_MSG_MOD(extack, "Transceiver module is powering down");
@@ -5605,6 +5620,7 @@ const struct ethtool_ops bnxt_ethtool_ops = {
 	.set_channels		= bnxt_set_channels,
 	.get_rxnfc		= bnxt_get_rxnfc,
 	.set_rxnfc		= bnxt_set_rxnfc,
+	.get_rx_ring_count	= bnxt_get_rx_ring_count,
 	.get_rxfh_indir_size    = bnxt_get_rxfh_indir_size,
 	.get_rxfh_key_size      = bnxt_get_rxfh_key_size,
 	.get_rxfh               = bnxt_get_rxfh,

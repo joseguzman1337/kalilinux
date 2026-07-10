@@ -3,7 +3,7 @@ alabaster >=0.7,<0.8
 docutils>=0.15,<0.18
 jinja2>=3.1,<4
 PyYAML>=5.1,<6.1
-Sphinx==3.4.3
+Sphinx==3.5.4
 sphinxcontrib-applehelp==1.0.8
 sphinxcontrib-devhelp==1.0.1
 sphinxcontrib-htmlhelp==1.0.3

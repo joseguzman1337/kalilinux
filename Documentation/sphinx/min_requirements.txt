@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0
 alabaster >=0.7,<0.8
-docutils>=0.15,<0.18
+docutils>=0.23,<0.24
 jinja2>=3.1,<4
 PyYAML>=5.1,<6.1
 Sphinx==3.4.3
